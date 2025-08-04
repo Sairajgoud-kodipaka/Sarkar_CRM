@@ -28,23 +28,36 @@ interface SidebarProps {
   userFloor?: string;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { name: 'Customers', href: '/admin/customers', icon: Users, badge: 'New' },
-  { name: 'Visitors', href: '/admin/visitors', icon: Users },
-  { name: 'Sales', href: '/admin/sales', icon: DollarSign },
-  { name: 'Products', href: '/admin/products', icon: Package },
-  { name: 'Sales & Analytics', href: '/admin/analytics', icon: BarChart3 },
-  { name: 'Team Management', href: '/admin/team', icon: UserPlus },
-  { name: 'Floors', href: '/admin/floors', icon: Building2 },
-  { name: 'Support', href: '/admin/support', icon: HelpCircle },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+// Base navigation items without URLs
+const baseNavigation = [
+  { name: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Customers', icon: Users, badge: 'New' },
+  { name: 'Visitors', icon: Users },
+  { name: 'Sales', icon: DollarSign },
+  { name: 'Products', icon: Package },
+  { name: 'Sales & Analytics', icon: BarChart3 },
+  { name: 'Team Management', icon: UserPlus },
+  { name: 'Floors', icon: Building2 },
+  { name: 'Support', icon: HelpCircle },
+  { name: 'Settings', icon: Settings },
 ];
 
 export function Sidebar({ isOpen, onToggle, userRole = 'BUSINESS_ADMIN', userFloor }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  // Generate navigation URLs based on user role
+  const getNavigationUrls = () => {
+    const basePath = userRole === 'FLOOR_MANAGER' ? '/floor-manager' : '/admin';
+    
+    return baseNavigation.map(item => ({
+      ...item,
+      href: `${basePath}/${item.name.toLowerCase().replace(/\s+/g, '-').replace('&', 'and')}`
+    }));
+  };
+
+  const navigation = getNavigationUrls();
 
   const handleSignOut = () => {
     logout();

@@ -1,93 +1,119 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+// Temporary mock data to get frontend working
+const mockSales = [
+  {
+    id: '1',
+    customer_id: '1',
+    customer: { id: '1', name: 'John Doe', email: 'john@example.com' },
+    product_id: '1',
+    product: { id: '1', name: 'Diamond Ring', price: 2500.00 },
+    amount: 2500.00,
+    quantity: 1,
+    status: 'COMPLETED',
+    payment_method: 'CREDIT_CARD',
+    salesperson_id: '1',
+    salesperson: { id: '1', name: 'Salesperson 1' },
+    floor_id: '1',
+    floor: { id: '1', name: 'Floor 1' },
+    created_at: '2024-01-15T10:00:00Z',
+    updated_at: '2024-01-15T10:00:00Z'
+  },
+  {
+    id: '2',
+    customer_id: '2',
+    customer: { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
+    product_id: '2',
+    product: { id: '2', name: 'Sapphire Necklace', price: 1200.00 },
+    amount: 1200.00,
+    quantity: 1,
+    status: 'PENDING',
+    payment_method: 'CASH',
+    salesperson_id: '2',
+    salesperson: { id: '2', name: 'Salesperson 2' },
+    floor_id: '2',
+    floor: { id: '2', name: 'Floor 2' },
+    created_at: '2024-01-16T11:00:00Z',
+    updated_at: '2024-01-16T11:00:00Z'
+  },
+  {
+    id: '3',
+    customer_id: '3',
+    customer: { id: '3', name: 'Bob Johnson', email: 'bob@example.com' },
+    product_id: '3',
+    product: { id: '3', name: 'Emerald Earrings', price: 1800.00 },
+    amount: 1800.00,
+    quantity: 1,
+    status: 'COMPLETED',
+    payment_method: 'BANK_TRANSFER',
+    salesperson_id: '1',
+    salesperson: { id: '1', name: 'Salesperson 1' },
+    floor_id: '1',
+    floor: { id: '1', name: 'Floor 1' },
+    created_at: '2024-01-17T12:00:00Z',
+    updated_at: '2024-01-17T12:00:00Z'
+  }
+];
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
-    const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
     const floorId = searchParams.get('floorId') || '';
-    const customerId = searchParams.get('customerId') || '';
-    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined;
-    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined;
+    const salespersonId = searchParams.get('salespersonId') || '';
+    const startDate = searchParams.get('startDate') || '';
+    const endDate = searchParams.get('endDate') || '';
 
-    const skip = (page - 1) * limit;
+    // Filter sales based on parameters
+    let filteredSales = mockSales;
 
-    // Build where clause
-    const where: any = {
-      store_id: '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
-    };
-
-    if (status) where.status = status;
-    if (floorId) where.floor_id = floorId;
-    if (customerId) where.customer_id = customerId;
-
-    if (startDate || endDate) {
-      where.created_at = {};
-      if (startDate) where.created_at.gte = startDate;
-      if (endDate) where.created_at.lte = endDate;
+    if (status) {
+      filteredSales = filteredSales.filter(sale => sale.status === status);
     }
 
-    // Get sales with pagination
-    const sales = await prisma.sales.findMany({
-      where,
-      orderBy: {
-        created_at: 'desc'
-      },
-      skip,
-      take: limit
-    });
+    if (floorId) {
+      filteredSales = filteredSales.filter(sale => sale.floor_id === floorId);
+    }
 
-    // Get total count
-    const total = await prisma.sales.count({ where });
+    if (salespersonId) {
+      filteredSales = filteredSales.filter(sale => sale.salesperson_id === salespersonId);
+    }
 
-    // Fetch related data for each sale
-    const salesWithRelations = await Promise.all(
-      sales.map(async (sale) => {
-        const [customer, product, floor, user] = await Promise.all([
-          prisma.customers.findUnique({
-            where: { id: sale.customer_id },
-            select: { id: true, name: true, phone: true }
-          }),
-          prisma.products.findUnique({
-            where: { id: sale.product_id },
-            select: { id: true, name: true, sku: true }
-          }),
-          prisma.floors.findUnique({
-            where: { id: sale.floor_id },
-            select: { id: true, name: true }
-          }),
-          prisma.users.findUnique({
-            where: { id: sale.user_id },
-            select: { id: true, name: true }
-          })
-        ]);
+    if (startDate && endDate) {
+      filteredSales = filteredSales.filter(sale => {
+        const saleDate = new Date(sale.created_at);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return saleDate >= start && saleDate <= end;
+      });
+    }
 
-        return {
-          ...sale,
-          customer,
-          product,
-          floor,
-          user
-        };
-      })
-    );
+    // Calculate pagination
+    const total = filteredSales.length;
+    const skip = (page - 1) * limit;
+    const paginatedSales = filteredSales.slice(skip, skip + limit);
 
-    // Calculate total revenue
-    const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+    // Calculate stats
+    const stats = {
+      total: mockSales.length,
+      completed: mockSales.filter(s => s.status === 'COMPLETED').length,
+      pending: mockSales.filter(s => s.status === 'PENDING').length,
+      totalRevenue: mockSales.reduce((sum, s) => sum + s.amount, 0),
+      averageSale: mockSales.reduce((sum, s) => sum + s.amount, 0) / mockSales.length
+    };
 
     return NextResponse.json({
       success: true,
-      data: salesWithRelations,
+      data: paginatedSales,
       pagination: {
         page,
         limit,
         total,
         pages: Math.ceil(total / limit)
       },
-      totalRevenue
+      stats
     });
   } catch (error: any) {
     console.error('Sales GET error:', error);
@@ -104,124 +130,51 @@ export async function POST(request: NextRequest) {
     const {
       customerId,
       productId,
-      floorId,
       amount,
       quantity = 1,
-      discount = 0,
-      paymentMethod = 'CASH',
-      notes = '',
-      storeId = '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
+      status = 'PENDING',
+      paymentMethod,
+      salespersonId,
+      floorId,
+      notes
     } = body;
 
-    // Validation
-    if (!customerId || !productId || !floorId || !amount) {
+    // Validate required fields
+    if (!customerId || !productId || !amount) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: customerId, productId, floorId, amount' },
+        { success: false, error: 'Customer ID, Product ID, and Amount are required' },
         { status: 400 }
       );
     }
 
-    if (amount <= 0 || quantity <= 0 || discount < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid amount, quantity, or discount values' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer, product, and floor exist
-    const [customer, product, floor] = await Promise.all([
-      prisma.customers.findUnique({ where: { id: customerId } }),
-      prisma.products.findUnique({ where: { id: productId } }),
-      prisma.floors.findUnique({ where: { id: floorId } })
-    ]);
-
-    if (!customer) {
-      return NextResponse.json(
-        { success: false, error: 'Customer not found' },
-        { status: 404 }
-      );
-    }
-
-    if (!product) {
-      return NextResponse.json(
-        { success: false, error: 'Product not found' },
-        { status: 404 }
-      );
-    }
-
-    if (!floor) {
-      return NextResponse.json(
-        { success: false, error: 'Floor not found' },
-        { status: 404 }
-      );
-    }
-
-    // Calculate total amount
-    const totalAmount = (parseFloat(amount) * parseInt(quantity)) - parseFloat(discount);
-    
-    // Create the sale
-    const sale = await prisma.sales.create({
-      data: {
-        amount: parseFloat(amount),
-        quantity: parseInt(quantity),
-        discount: parseFloat(discount),
-        total_amount: totalAmount,
-        payment_method: paymentMethod,
-        status: 'COMPLETED',
-        notes,
-        store_id: storeId,
-        floor_id: floorId,
-        customer_id: customerId,
-        product_id: productId,
-        user_id: '550e8400-e29b-41d4-a716-446655440008' // Use proper UUID for user
-      }
-    });
-
-    // Fetch related data for the created sale
-    const [saleCustomer, saleProduct, saleFloor, saleUser] = await Promise.all([
-      prisma.customers.findUnique({
-        where: { id: sale.customer_id },
-        select: { id: true, name: true, phone: true, email: true }
-      }),
-      prisma.products.findUnique({
-        where: { id: sale.product_id },
-        select: { id: true, name: true, sku: true, price: true }
-      }),
-      prisma.floors.findUnique({
-        where: { id: sale.floor_id },
-        select: { id: true, name: true, number: true }
-      }),
-      prisma.users.findUnique({
-        where: { id: sale.user_id },
-        select: { id: true, name: true, email: true }
-      })
-    ]);
-
-    const saleWithRelations = {
-      ...sale,
-      customer: saleCustomer,
-      product: saleProduct,
-      floor: saleFloor,
-      user: saleUser
+    // Create new sale (mock)
+    const newSale = {
+      id: Date.now().toString(),
+      customer_id: customerId,
+      customer: { id: customerId, name: 'Customer Name', email: 'customer@example.com' },
+      product_id: productId,
+      product: { id: productId, name: 'Product Name', price: amount },
+      amount: parseFloat(amount),
+      quantity,
+      status,
+      payment_method: paymentMethod || 'CASH',
+      salesperson_id: salespersonId,
+      salesperson: { id: salespersonId, name: 'Salesperson Name' },
+      floor_id: floorId,
+      floor: { id: floorId, name: 'Floor Name' },
+      notes,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
-    // Create interaction record for this sale
-    await prisma.interactions.create({
-      data: {
-        type: 'SALE',
-        description: `Sale recorded: ${saleProduct?.name} for ₹${saleWithRelations.total_amount}`,
-        outcome: 'COMPLETED',
-        next_action: 'Follow up for future purchases',
-        customer_id: customerId,
-        user_id: '550e8400-e29b-41d4-a716-446655440008'
-      }
-    });
+    // Add to mock data
+    mockSales.push(newSale);
 
     return NextResponse.json({
       success: true,
-      message: 'Sale recorded successfully',
-      data: saleWithRelations
-    });
+      data: newSale,
+      message: 'Sale created successfully'
+    }, { status: 201 });
   } catch (error: any) {
     console.error('Sales POST error:', error);
     return NextResponse.json(

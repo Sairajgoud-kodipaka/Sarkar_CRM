@@ -32,7 +32,7 @@ import {
 
 export default function AdminFloors() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Real data hooks
   const { 
@@ -42,7 +42,7 @@ export default function AdminFloors() {
     refetch 
   } = useFloors({ search: searchQuery, status: statusFilter, limit: 50 });
 
-  const floors = floorsResponse?.data || [];
+  const floors = floorsResponse || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -98,14 +98,15 @@ export default function AdminFloors() {
           title="Floor Management"
           description="Manage store floors and their performance"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'Add Floor',
-              icon: Plus,
-              onClick: () => console.log('Add floor'),
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <Button onClick={() => {
+              // TODO: Open add floor modal or navigate to add page
+              alert('Add Floor functionality - will be implemented with real form')
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Floor
+            </Button>
+          }
         />
 
         {/* Stats Cards */}
@@ -130,10 +131,10 @@ export default function AdminFloors() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {floors.filter(f => f.is_active).length}
+                {floors.filter((f: any) => f.is_active).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {((floors.filter(f => f.is_active).length / floors.length) * 100).toFixed(1)}% of total
+                {((floors.filter((f: any) => f.is_active).length / floors.length) * 100).toFixed(1)}% of total
               </p>
             </CardContent>
           </Card>
@@ -145,7 +146,7 @@ export default function AdminFloors() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {floors.reduce((sum, floor) => sum + (floor.staff_count || 0), 0)}
+                {floors.reduce((sum: number, floor: any) => sum + (floor.staff_count || 0), 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Across all floors
@@ -160,7 +161,7 @@ export default function AdminFloors() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(floors.reduce((sum, floor) => sum + (floor.total_sales || 0), 0))}
+                {formatCurrency(floors.reduce((sum: number, floor: any) => sum + (floor.total_sales || 0), 0))}
               </div>
               <p className="text-xs text-muted-foreground">
                 This month
@@ -195,7 +196,7 @@ export default function AdminFloors() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="ALL">All Status</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
@@ -225,7 +226,7 @@ export default function AdminFloors() {
                   </tr>
                 </thead>
                 <tbody>
-                  {floors.map((floor) => (
+                  {floors.map((floor: any) => (
                     <tr key={floor.id} className="border-b hover:bg-gray-50">
                       <td className="p-2">
                         <div className="flex items-center">

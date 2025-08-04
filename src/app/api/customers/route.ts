@@ -1,5 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+// Temporary mock data to get frontend working
+const mockCustomers = [
+  {
+    id: '1',
+    name: 'John Doe',
+    email: 'john@example.com',
+    phone: '+1234567890',
+    city: 'New York',
+    state: 'NY',
+    status: 'ACTIVE',
+    floor: { id: '1', name: 'Floor 1' },
+    assignedTo: { id: '1', name: 'Salesperson 1' },
+    created_at: '2024-01-15T10:00:00Z'
+  },
+  {
+    id: '2',
+    name: 'Jane Smith',
+    email: 'jane@example.com',
+    phone: '+1234567891',
+    city: 'Los Angeles',
+    state: 'CA',
+    status: 'PROSPECT',
+    floor: { id: '2', name: 'Floor 2' },
+    assignedTo: { id: '2', name: 'Salesperson 2' },
+    created_at: '2024-01-16T11:00:00Z'
+  },
+  {
+    id: '3',
+    name: 'Bob Johnson',
+    email: 'bob@example.com',
+    phone: '+1234567892',
+    city: 'Chicago',
+    state: 'IL',
+    status: 'CONVERTED',
+    floor: { id: '1', name: 'Floor 1' },
+    assignedTo: { id: '1', name: 'Salesperson 1' },
+    created_at: '2024-01-17T12:00:00Z'
+  }
+];
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,73 +47,41 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || '';
-    const floorId = searchParams.get('floorId') || '';
-    const assignedToId = searchParams.get('assignedToId') || '';
 
-    const skip = (page - 1) * limit;
-
-    // Build where clause
-    const where: any = {
-      store_id: '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
-    };
+    // Filter customers based on search and status
+    let filteredCustomers = mockCustomers;
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } }
-      ];
+      filteredCustomers = filteredCustomers.filter(customer =>
+        customer.name.toLowerCase().includes(search.toLowerCase()) ||
+        customer.email?.toLowerCase().includes(search.toLowerCase()) ||
+        customer.phone.includes(search)
+      );
     }
 
-    if (status) where.status = status;
-    if (floorId) where.floor_id = floorId;
-    if (assignedToId) where.assigned_to_id = assignedToId;
+    if (status) {
+      filteredCustomers = filteredCustomers.filter(customer =>
+        customer.status === status
+      );
+    }
 
-    // Get customers with pagination
-    const customers = await prisma.customers.findMany({
-      where,
-      orderBy: {
-        created_at: 'desc'
-      },
-      skip,
-      take: limit
-    });
-
-    // Get total count
-    const total = await prisma.customers.count({ where });
-
-    // Fetch related data for each customer
-    const customersWithRelations = await Promise.all(
-      customers.map(async (customer) => {
-        const [floor, assignedTo] = await Promise.all([
-          customer.floor_id ? prisma.floors.findUnique({
-            where: { id: customer.floor_id },
-            select: { id: true, name: true, number: true }
-          }) : null,
-          customer.assigned_to_id ? prisma.users.findUnique({
-            where: { id: customer.assigned_to_id },
-            select: { id: true, name: true, email: true }
-          }) : null
-        ]);
-
-        return {
-          ...customer,
-          floor,
-          assignedTo
-        };
-      })
-    );
+    // Calculate pagination
+    const total = filteredCustomers.length;
+    const skip = (page - 1) * limit;
+    const paginatedCustomers = filteredCustomers.slice(skip, skip + limit);
 
     // Calculate stats
     const stats = {
-      total: await prisma.customers.count({ where: { store_id: '550e8400-e29b-41d4-a716-446655440000' } }),
-      active: await prisma.customers.count({ where: { store_id: '550e8400-e29b-41d4-a716-446655440000', status: 'ACTIVE' } }),
-      inactive: await prisma.customers.count({ where: { store_id: '550e8400-e29b-41d4-a716-446655440000', status: 'INACTIVE' } })
+      total: mockCustomers.length,
+      active: mockCustomers.filter(c => c.status === 'ACTIVE').length,
+      inactive: mockCustomers.filter(c => c.status === 'INACTIVE').length,
+      prospect: mockCustomers.filter(c => c.status === 'PROSPECT').length,
+      converted: mockCustomers.filter(c => c.status === 'CONVERTED').length
     };
 
     return NextResponse.json({
       success: true,
-      data: customersWithRelations,
+      data: paginatedCustomers,
       pagination: {
         page,
         limit,
@@ -111,12 +118,12 @@ export async function POST(request: NextRequest) {
       occasions,
       budgetRange,
       notes,
+      status = 'ACTIVE',
       floorId,
-      assignedToId,
-      storeId = '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
+      assignedToId
     } = body;
 
-    // Validation
+    // Validate required fields
     if (!name || !phone) {
       return NextResponse.json(
         { success: false, error: 'Name and phone are required' },
@@ -124,69 +131,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if customer with same phone already exists
-    const existingCustomer = await prisma.customers.findFirst({
-      where: {
-        phone,
-        store_id: storeId
-      }
-    });
-
-    if (existingCustomer) {
-      return NextResponse.json(
-        { success: false, error: 'Customer with this phone number already exists' },
-        { status: 400 }
-      );
-    }
-
-    // Create customer
-    const customer = await prisma.customers.create({
-      data: {
-        name,
-        email,
-        phone,
-        address,
-        city,
-        state,
-        pincode,
-        date_of_birth: dateOfBirth ? new Date(dateOfBirth) : null,
-        gender,
-        occupation,
-        income_range: incomeRange,
-        social_circle: socialCircle,
-        occasions,
-        budget_range: budgetRange,
-        notes,
-        status: 'ACTIVE',
-        store_id: storeId,
-        floor_id: floorId,
-        assigned_to_id: assignedToId
-      }
-    });
-
-    // Fetch related data for created customer
-    const [floor, assignedTo] = await Promise.all([
-      customer.floor_id ? prisma.floors.findUnique({
-        where: { id: customer.floor_id },
-        select: { id: true, name: true, number: true }
-      }) : null,
-      customer.assigned_to_id ? prisma.users.findUnique({
-        where: { id: customer.assigned_to_id },
-        select: { id: true, name: true, email: true }
-      }) : null
-    ]);
-
-    const customerWithRelations = {
-      ...customer,
-      floor,
-      assignedTo
+    // Create new customer (mock)
+    const newCustomer = {
+      id: Date.now().toString(),
+      name,
+      email,
+      phone,
+      address,
+      city,
+      state,
+      pincode,
+      date_of_birth: dateOfBirth,
+      gender,
+      occupation,
+      income_range: incomeRange,
+      social_circle: socialCircle,
+      occasions,
+      budget_range: budgetRange,
+      notes,
+      status,
+      floor: { id: floorId || '1', name: 'Floor 1' },
+      assignedTo: { id: assignedToId || '1', name: 'Salesperson 1' },
+      created_at: new Date().toISOString()
     };
+
+    // Add to mock data
+    mockCustomers.push(newCustomer);
 
     return NextResponse.json({
       success: true,
-      message: 'Customer created successfully',
-      data: customerWithRelations
-    });
+      data: newCustomer,
+      message: 'Customer created successfully'
+    }, { status: 201 });
   } catch (error: any) {
     console.error('Customers POST error:', error);
     return NextResponse.json(

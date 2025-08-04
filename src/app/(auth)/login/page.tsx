@@ -30,6 +30,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
       console.log('Login successful, redirecting...');
+      // Let the dashboard page handle role-based redirects
       router.push('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -67,8 +68,8 @@ export default function LoginPage() {
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800 text-xs sm:text-sm">
                 <strong>Test Credentials:</strong><br />
-                Email: admin@sarkarcrm.com<br />
-                Password: admin123
+                Admin: admin@sarkarcrm.com / admin123<br />
+                Floor Manager: manager@sarkarcrm.com / manager123
               </AlertDescription>
             </Alert>
 

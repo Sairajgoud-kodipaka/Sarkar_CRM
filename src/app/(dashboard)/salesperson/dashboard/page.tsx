@@ -93,7 +93,7 @@ export default function SalespersonDashboard() {
             {
               label: 'New Sale',
               icon: Plus,
-              onClick: () => console.log('New sale'),
+              onClick: () => window.location.href = '/salesperson/sales/new',
               variant: 'default'
             }
           ]}

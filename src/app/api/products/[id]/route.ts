@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 // GET /api/products/[id] - Get product by ID
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const product = await prisma.product.findUnique({
+    const product = await prisma.products.findUnique({
       where: { id: params.id }
     });
 
@@ -48,7 +48,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     } = body;
 
     // Check if product exists
-    const existingProduct = await prisma.product.findUnique({
+    const existingProduct = await prisma.products.findUnique({
       where: { id: params.id }
     });
 
@@ -60,22 +60,22 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Update product
-    const product = await prisma.product.update({
+    const product = await prisma.products.update({
       where: { id: params.id },
       data: {
         name: name || existingProduct.name,
         description: description || existingProduct.description,
         price: price ? parseFloat(price) : existingProduct.price,
-        costPrice: costPrice ? parseFloat(costPrice) : existingProduct.costPrice,
+        cost_price: costPrice ? parseFloat(costPrice) : existingProduct.cost_price,
         weight: weight ? parseFloat(weight) : existingProduct.weight,
         material: material || existingProduct.material,
         gemstone: gemstone || existingProduct.gemstone,
         purity: purity || existingProduct.purity,
         images: images || existingProduct.images,
         specifications: specifications || existingProduct.specifications,
-        isActive: isActive !== undefined ? isActive : existingProduct.isActive,
-        categoryId: categoryId || existingProduct.categoryId,
-        updatedAt: new Date()
+        is_active: isActive !== undefined ? isActive : existingProduct.is_active,
+        category_id: categoryId || existingProduct.category_id,
+        updated_at: new Date()
       }
     });
 
@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Check if product exists
-    const existingProduct = await prisma.product.findUnique({
+    const existingProduct = await prisma.products.findUnique({
       where: { id: params.id }
     });
 
@@ -109,7 +109,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     // Delete product
-    await prisma.product.delete({
+    await prisma.products.delete({
       where: { id: params.id }
     });
 

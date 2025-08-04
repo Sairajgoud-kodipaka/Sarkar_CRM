@@ -14,14 +14,19 @@ import {
   Package,
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Target,
   Calendar,
   Clock,
   Star,
   Eye,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Building,
+  UserCheck,
+  ShoppingCart,
+  AlertCircle,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 export default function FloorManagerDashboard() {
@@ -33,12 +38,24 @@ export default function FloorManagerDashboard() {
   const { data: productsResponse, loading: productsLoading, error: productsError } = useProducts({ limit: 10 });
   const { data: salesResponse, loading: salesLoading, error: salesError } = useSales({ limit: 10 });
 
-  const customers = customersResponse?.data || [];
-  const products = productsResponse?.data || [];
-  const sales = salesResponse?.data || [];
+  const customers = customersResponse || [];
+  const products = productsResponse || [];
+  const sales = salesResponse || [];
 
   const loading = customersLoading || productsLoading || salesLoading;
   const error = customersError || productsError || salesError;
+
+  // Mock floor-specific data
+  const floorStats = {
+    staffOnDuty: 4,
+    totalStaff: 6,
+    activeCustomers: customers.filter((c: any) => c.status === 'ACTIVE').length,
+    pendingApprovals: 3,
+    floorPerformance: 87,
+    inventoryAlerts: 2,
+    todayVisitors: 12,
+    conversionRate: 68
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -87,125 +104,203 @@ export default function FloorManagerDashboard() {
     <DashboardLayout>
       <div className="p-6">
         <PageHeader
-          title={`${currentFloor} Dashboard`}
-          description="Manage your floor operations and performance"
+          title="Floor Manager Dashboard"
+          description="Monitor your floor's performance and manage operations"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'Add Customer',
-              icon: Plus,
-              onClick: () => console.log('Add customer'),
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.href = '/floor-manager/customers'}>
+                <Users className="h-4 w-4 mr-2" />
+                Manage Customers
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/floor-manager/approvals'}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                View Approvals
+              </Button>
+            </div>
+          }
         />
 
-        {/* Stats Cards */}
+        {/* Floor-Specific Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+              <CardTitle className="text-sm font-medium">Staff on Duty</CardTitle>
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{floorStats.staffOnDuty}/{floorStats.totalStaff}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">+1</span> from yesterday
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{customers.length}</div>
+              <div className="text-2xl font-bold">{floorStats.activeCustomers}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+12%</span> from last month
+                {floorStats.todayVisitors} visitors today
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {products.filter(p => p.is_active).length}
-              </div>
+              <div className="text-2xl font-bold">{floorStats.pendingApprovals}</div>
               <p className="text-xs text-muted-foreground">
-                {products.length} total products
+                Require your attention
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {sales.length} transactions
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Performance</CardTitle>
+              <CardTitle className="text-sm font-medium">Floor Performance</CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">94%</div>
+              <div className="text-2xl font-bold">{floorStats.floorPerformance}%</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+2.1%</span> from last week
+                <span className="text-green-600">+5%</span> from last week
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Recent Customers */}
+        {/* Floor Operations Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Staff Management */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Customers</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Staff Management
+              </CardTitle>
               <CardDescription>
-                Latest customer interactions on your floor
+                Current floor staff status and activities
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {customers.slice(0, 5).map((customer) => (
-                  <div key={customer.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Users className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="text-sm text-gray-500">{customer.email}</div>
-                      </div>
-                    </div>
-                    <Badge className={getStatusColor(customer.status)}>
-                      {customer.status}
-                    </Badge>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">On Duty</span>
+                  <Badge variant="default" className="bg-green-100 text-green-800">
+                    {floorStats.staffOnDuty} Staff
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">On Break</span>
+                  <Badge variant="outline">2 Staff</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Off Duty</span>
+                  <Badge variant="outline">0 Staff</Badge>
+                </div>
+                <div className="pt-2 border-t">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Schedule
+                  </Button>
+                </div>
               </div>
-              <Button variant="outline" className="w-full mt-4">
-                <Eye className="h-4 w-4 mr-2" />
-                View All Customers
-              </Button>
             </CardContent>
           </Card>
 
+          {/* Customer Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Customer Activity
+              </CardTitle>
+              <CardDescription>
+                Real-time customer interactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Currently Shopping</span>
+                  <Badge variant="default" className="bg-blue-100 text-blue-800">
+                    {floorStats.activeCustomers} Customers
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Conversion Rate</span>
+                  <Badge variant="outline">{floorStats.conversionRate}%</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Today's Visitors</span>
+                  <Badge variant="outline">{floorStats.todayVisitors}</Badge>
+                </div>
+                <div className="pt-2 border-t">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inventory Alerts */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Inventory Alerts
+              </CardTitle>
+              <CardDescription>
+                Products requiring attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Low Stock</span>
+                  <Badge variant="destructive">{floorStats.inventoryAlerts} Items</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Out of Stock</span>
+                  <Badge variant="outline">0 Items</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Expiring Soon</span>
+                  <Badge variant="outline">1 Item</Badge>
+                </div>
+                <div className="pt-2 border-t">
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Alerts
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity and Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Sales */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Sales</CardTitle>
+              <CardTitle>Recent Floor Sales</CardTitle>
               <CardDescription>
                 Latest transactions on your floor
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {sales.slice(0, 5).map((sale) => (
+                {sales.slice(0, 5).map((sale: any) => (
                   <div key={sale.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -237,37 +332,45 @@ export default function FloorManagerDashboard() {
               </Button>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>
-              Common tasks for floor management
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-20 flex-col">
-                <Users className="h-6 w-6 mb-2" />
-                <span className="text-sm">Add Customer</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex-col">
-                <Package className="h-6 w-6 mb-2" />
-                <span className="text-sm">View Products</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex-col">
-                <DollarSign className="h-6 w-6 mb-2" />
-                <span className="text-sm">Record Sale</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex-col">
-                <Target className="h-6 w-6 mb-2" />
-                <span className="text-sm">Performance</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Floor Management Actions</CardTitle>
+              <CardDescription>
+                Common tasks for floor operations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" className="h-16 flex-col">
+                  <Users className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Manage Staff</span>
+                </Button>
+                <Button variant="outline" className="h-16 flex-col">
+                  <ShoppingCart className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Record Sale</span>
+                </Button>
+                <Button variant="outline" className="h-16 flex-col">
+                  <Package className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Check Inventory</span>
+                </Button>
+                <Button variant="outline" className="h-16 flex-col">
+                  <AlertCircle className="h-5 w-5 mb-1" />
+                  <span className="text-xs">View Alerts</span>
+                </Button>
+                <Button variant="outline" className="h-16 flex-col">
+                  <Calendar className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Schedule</span>
+                </Button>
+                <Button variant="outline" className="h-16 flex-col">
+                  <Target className="h-5 w-5 mb-1" />
+                  <span className="text-xs">Performance</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

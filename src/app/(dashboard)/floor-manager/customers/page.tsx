@@ -27,13 +27,27 @@ import {
   MapPin,
   Calendar,
   CheckCircle,
-  XCircle
+  XCircle,
+  Users,
+  UserCheck,
+  Clock,
+  Target
 } from 'lucide-react';
+
+interface Customer {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  status: string;
+  assignedTo?: { id: string; name: string };
+  created_at: string;
+}
 
 export default function FloorManagerCustomers() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [floorFilter, setFloorFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [staffFilter, setStaffFilter] = useState('ALL');
 
   // Real data hooks
   const { 
@@ -41,9 +55,19 @@ export default function FloorManagerCustomers() {
     loading, 
     error, 
     refetch 
-  } = useCustomers({ search: searchQuery, status: statusFilter, floor: floorFilter, limit: 50 });
+  } = useCustomers({ search: searchQuery, status: statusFilter, limit: 50 });
 
-  const customers = customersResponse?.data || [];
+  const customers = customersResponse || [];
+
+  // Mock floor-specific data
+  const floorStats = {
+    totalCustomers: customers.length,
+    activeCustomers: customers.filter((c: Customer) => c.status === 'ACTIVE').length,
+    assignedToStaff: customers.filter((c: Customer) => c.assignedTo).length,
+    unassigned: customers.filter((c: Customer) => !c.assignedTo).length,
+    todayVisitors: 8,
+    conversionRate: 75
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -70,7 +94,7 @@ export default function FloorManagerCustomers() {
     return (
       <DashboardLayout>
         <div className="p-6">
-          <LoadingSpinner text="Loading customers..." />
+          <LoadingSpinner text="Loading floor customers..." />
         </div>
       </DashboardLayout>
     );
@@ -90,209 +114,215 @@ export default function FloorManagerCustomers() {
     <DashboardLayout>
       <div className="p-6">
         <PageHeader
-          title="Floor Customers"
-          description="Manage customers on your floor"
+          title="Floor Customer Management"
+          description="Manage customers and staff assignments on your floor"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'Add Customer',
-              icon: Plus,
-              onClick: () => console.log('Add customer'),
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.href = '/floor-manager/customers/new'}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Customer
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/floor-manager/team'}>
+                <UserCheck className="h-4 w-4 mr-2" />
+                Assign Staff
+              </Button>
+            </div>
+          }
         />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        {/* Floor Customer Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-              <User className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{customers.length}</div>
+              <div className="text-2xl font-bold">{floorStats.totalCustomers}</div>
               <p className="text-xs text-muted-foreground">
-                On your floor
+                {floorStats.activeCustomers} active customers
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Assigned to Staff</CardTitle>
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {customers.filter(c => c.status === 'ACTIVE').length}
-              </div>
+              <div className="text-2xl font-bold">{floorStats.assignedToStaff}</div>
               <p className="text-xs text-muted-foreground">
-                {((customers.filter(c => c.status === 'ACTIVE').length / customers.length) * 100).toFixed(1)}% of total
+                {floorStats.unassigned} need assignment
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New This Month</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Today's Visitors</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {customers.filter(c => {
-                  const created = new Date(c.created_at);
-                  const now = new Date();
-                  return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-                }).length}
-              </div>
+              <div className="text-2xl font-bold">{floorStats.todayVisitors}</div>
               <p className="text-xs text-muted-foreground">
-                Recent additions
+                {floorStats.conversionRate}% conversion rate
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Follow-ups</CardTitle>
-              <XCircle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Floor Performance</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {customers.filter(c => c.status === 'PENDING').length}
-              </div>
+              <div className="text-2xl font-bold">87%</div>
               <p className="text-xs text-muted-foreground">
-                Need attention
+                <span className="text-green-600">+3%</span> from last week
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters and Search */}
+        {/* Search and Filters */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Customers</CardTitle>
+            <CardTitle>Search & Filter Customers</CardTitle>
             <CardDescription>
-              Showing {customers.length} customers on your floor
+              Find and manage customers on your floor
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search customers..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search customers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
               </div>
+              
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="All Status" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="ALL">All Status</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="INACTIVE">Inactive</SelectItem>
                   <SelectItem value="PENDING">Pending</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={floorFilter} onValueChange={setFloorFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="All Floors" />
+
+              <Select value={staffFilter} onValueChange={setStaffFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Staff Assignment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Floors</SelectItem>
-                  <SelectItem value="Floor 1">Floor 1</SelectItem>
-                  <SelectItem value="Floor 2">Floor 2</SelectItem>
-                  <SelectItem value="Floor 3">Floor 3</SelectItem>
+                  <SelectItem value="ALL">All Staff</SelectItem>
+                  <SelectItem value="ASSIGNED">Assigned</SelectItem>
+                  <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleSearch} variant="outline">
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-              <Button onClick={handleRefresh} variant="outline">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
 
-            {/* Customers Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 font-medium">Customer</th>
-                    <th className="text-left p-2 font-medium">Contact</th>
-                    <th className="text-left p-2 font-medium">Location</th>
-                    <th className="text-left p-2 font-medium">Status</th>
-                    <th className="text-left p-2 font-medium">Created</th>
-                    <th className="text-left p-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer) => (
-                    <tr key={customer.id} className="border-b hover:bg-gray-50">
-                      <td className="p-2">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                            <User className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{customer.name}</div>
-                            <div className="text-sm text-gray-500">ID: {customer.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-3 w-3 mr-2 text-gray-400" />
+              <div className="flex gap-2">
+                <Button onClick={handleSearch} className="flex-1">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+                <Button variant="outline" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Customer List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Floor Customers</CardTitle>
+            <CardDescription>
+              Manage customer assignments and interactions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+                         <div className="space-y-4">
+               {customers.map((customer: Customer) => (
+                <div key={customer.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{customer.name}</div>
+                      <div className="text-sm text-gray-500 flex items-center gap-4">
+                        {customer.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
                             {customer.email}
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3 w-3 mr-2 text-gray-400" />
+                          </span>
+                        )}
+                        {customer.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
                             {customer.phone}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="flex items-center text-sm">
-                          <MapPin className="h-3 w-3 mr-2 text-gray-400" />
-                          {customer.city}, {customer.state}
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <Badge className={getStatusColor(customer.status)}>
-                          {customer.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2">
-                        <div className="text-sm">
-                          {new Date(customer.created_at).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-red-600">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <div className="text-sm font-medium">
+                        {customer.assignedTo ? customer.assignedTo.name : 'Unassigned'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {customer.assignedTo ? 'Assigned to Staff' : 'Needs Assignment'}
+                      </div>
+                    </div>
+                    
+                    <Badge className={getStatusColor(customer.status)}>
+                      {customer.status}
+                    </Badge>
+                    
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      {!customer.assignedTo && (
+                        <Button variant="outline" size="sm">
+                          <UserCheck className="h-4 w-4 mr-1" />
+                          Assign
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {customers.length === 0 && (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No customers found on this floor</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => window.location.href = '/floor-manager/customers/new'}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Customer
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

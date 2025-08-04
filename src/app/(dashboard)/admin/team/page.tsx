@@ -32,8 +32,8 @@ import {
 
 export default function AdminTeam() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Real data hooks
   const { 
@@ -104,14 +104,12 @@ export default function AdminTeam() {
           title="Team Management"
           description="Manage your team members and their roles"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'Add Member',
-              icon: Plus,
-              onClick: () => console.log('Add member'),
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <Button onClick={() => window.location.href = '/admin/team/new'}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Member
+            </Button>
+          }
         />
 
         {/* Stats Cards */}
@@ -136,10 +134,10 @@ export default function AdminTeam() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.is_active).length}
+                {users.filter((u: any) => u.is_active).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {((users.filter(u => u.is_active).length / users.length) * 100).toFixed(1)}% of total
+                {((users.filter((u: any) => u.is_active).length / users.length) * 100).toFixed(1)}% of total
               </p>
             </CardContent>
           </Card>
@@ -151,7 +149,7 @@ export default function AdminTeam() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'FLOOR_MANAGER').length}
+                {users.filter((u: any) => u.role === 'FLOOR_MANAGER').length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Managing floors
@@ -166,7 +164,7 @@ export default function AdminTeam() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {users.filter(u => u.role === 'SALESPERSON').length}
+                {users.filter((u: any) => u.role === 'SALESPERSON').length}
               </div>
               <p className="text-xs text-muted-foreground">
                 Active sales team
@@ -201,7 +199,7 @@ export default function AdminTeam() {
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Roles</SelectItem>
+                  <SelectItem value="ALL">All Roles</SelectItem>
                   <SelectItem value="BUSINESS_ADMIN">Business Admin</SelectItem>
                   <SelectItem value="FLOOR_MANAGER">Floor Manager</SelectItem>
                   <SelectItem value="SALESPERSON">Salesperson</SelectItem>
@@ -212,7 +210,7 @@ export default function AdminTeam() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="ALL">All Status</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
@@ -240,7 +238,7 @@ export default function AdminTeam() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {users.map((user: any) => (
                     <tr key={user.id} className="border-b hover:bg-gray-50">
                       <td className="p-2">
                         <div className="flex items-center">
@@ -292,5 +290,4 @@ export default function AdminTeam() {
       </div>
     </DashboardLayout>
   );
-} 
 } 

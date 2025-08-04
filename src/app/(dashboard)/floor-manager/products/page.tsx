@@ -29,10 +29,23 @@ import {
   XCircle
 } from 'lucide-react';
 
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category?: string;
+  category_id?: string;
+  sku?: string;
+  is_active: boolean;
+  stock_quantity?: number;
+  created_at: string;
+}
+
 export default function FloorManagerProducts() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
 
   // Real data hooks
   const { 
@@ -42,7 +55,7 @@ export default function FloorManagerProducts() {
     refetch 
   } = useProducts({ search: searchQuery, status: statusFilter, category: categoryFilter, limit: 50 });
 
-  const products = productsResponse?.data || [];
+  const products = productsResponse || [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -88,17 +101,21 @@ export default function FloorManagerProducts() {
     <DashboardLayout>
       <div className="p-6">
         <PageHeader
-          title="Floor Products"
-          description="Manage products available on your floor"
+          title="Floor Product Management"
+          description="Manage products and inventory on your floor"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'Add Product',
-              icon: Plus,
-              onClick: () => console.log('Add product'),
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.href = '/floor-manager/products/new'}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/floor-manager/inventory'}>
+                <Package className="h-4 w-4 mr-2" />
+                Manage Inventory
+              </Button>
+            </div>
+          }
         />
 
         {/* Stats Cards */}
@@ -123,10 +140,10 @@ export default function FloorManagerProducts() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {products.filter(p => p.is_active).length}
+                {products.filter((p: Product) => p.is_active).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {((products.filter(p => p.is_active).length / products.length) * 100).toFixed(1)}% of total
+                {((products.filter((p: Product) => p.is_active).length / products.length) * 100).toFixed(1)}% of total
               </p>
             </CardContent>
           </Card>
@@ -138,7 +155,7 @@ export default function FloorManagerProducts() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(products.reduce((sum, p) => sum + (p.price || 0), 0))}
+                {formatCurrency(products.reduce((sum: number, p: Product) => sum + (p.price || 0), 0))}
               </div>
               <p className="text-xs text-muted-foreground">
                 Inventory value
@@ -153,7 +170,7 @@ export default function FloorManagerProducts() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Set(products.map(p => p.category_id)).size}
+                {new Set(products.map((p: Product) => p.category)).size}
               </div>
               <p className="text-xs text-muted-foreground">
                 Different categories
@@ -188,7 +205,7 @@ export default function FloorManagerProducts() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="ALL">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
@@ -198,7 +215,7 @@ export default function FloorManagerProducts() {
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="ALL">All Categories</SelectItem>
                   <SelectItem value="rings">Rings</SelectItem>
                   <SelectItem value="necklaces">Necklaces</SelectItem>
                   <SelectItem value="earrings">Earrings</SelectItem>
@@ -229,7 +246,7 @@ export default function FloorManagerProducts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
+                  {products.map((product: Product) => (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
                       <td className="p-2">
                         <div className="flex items-center">

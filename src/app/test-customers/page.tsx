@@ -6,13 +6,6 @@ export default function TestCustomersPage() {
     </div>
   );
 } 
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Test Customers Page</h1>
-      <p>This is a test page to verify routing is working.</p>
-    </div>
-  );
-} 
  
  
  

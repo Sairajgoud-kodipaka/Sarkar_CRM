@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,88 +10,86 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
-import { useProducts } from '@/hooks/useRealData';
 import {
   Search,
-  Filter,
   Plus,
-  Download,
-  Upload,
-  RefreshCw,
+  ShoppingBag,
+  DollarSign,
+  TrendingUp,
   Eye,
   Edit,
-  Trash2, 
-  Tag,
-  DollarSign,
-  Hash,
-  CheckCircle
+  Trash2,
+  Package
 } from 'lucide-react';
 
-// Type definitions
 interface Product {
   id: string;
   name: string;
-  description: string;
-  sku: string;
-  categoryId: string;
+  description?: string;
   price: number;
-  isActive: boolean;
+  cost_price: number;
+  weight?: number;
+  material?: string;
+  gemstone?: string;
+  purity?: string;
+  is_active: boolean;
+  created_at: string;
 }
 
-interface ProductsResponse {
-  data: Product[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    pages: number;
-  };
+interface ProductStats {
+  total: number;
+  active: number;
+  inactive: number;
+  totalValue: number;
+  averagePrice: number;
 }
 
-export default function ProductsPage() {
+export default function AdminProducts() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState<ProductStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Real data hooks
-  const { 
-    data: productsResponse, 
-    loading, 
-    error, 
-    refetch: fetchProducts 
-  } = useProducts();
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const products = (productsResponse as ProductsResponse)?.data || [];
-  const total = (productsResponse as ProductsResponse)?.pagination?.total || 0;
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (statusFilter) params.append('status', statusFilter);
+      params.append('limit', '50');
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+      const response = await fetch(`/api/products?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-red-100 text-red-800';
-      case 'low-stock':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      const result = await response.json();
+      
+      if (result.success) {
+        setProducts(result.data || []);
+        setStats(result.stats || null);
+      } else {
+        throw new Error(result.error || 'Failed to fetch products');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch products');
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSearch = () => {
-    // Note: The hook doesn't accept parameters, so we'll need to implement filtering differently
+  useEffect(() => {
     fetchProducts();
-  };
+  }, [searchQuery, statusFilter]);
 
-  const handleRefresh = () => {
-    fetchProducts();
+  const getStatusColor = (isActive: boolean) => {
+    return isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
   };
 
   if (loading) {
@@ -109,7 +106,7 @@ export default function ProductsPage() {
     return (
       <DashboardLayout>
         <div className="p-6">
-          <ErrorMessage error={error} />
+          <ErrorMessage error={error} onRetry={fetchProducts} />
         </div>
       </DashboardLayout>
     );
@@ -117,40 +114,30 @@ export default function ProductsPage() {
 
   return (
     <DashboardLayout>
-      <PageHeader
-        title="Products"
-        description="Manage your product inventory"
-        breadcrumbs={true}
-        actions={
-          <>
-            <Button variant="outline" size="sm">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
+      <div className="p-6">
+        <PageHeader
+          title="Product Management"
+          description="Manage all jewelry products and inventory"
+          breadcrumbs={true}
+          actions={
+            <Button onClick={() => window.location.href = '/admin/products/new'}>
+              <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
-          </>
-        }
-      />
+          }
+        />
 
-      <div className="space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-              <Tag className="h-4 w-4 text-muted-foreground" />
+              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{total}</div>
+              <div className="text-2xl font-bold">{stats?.total || products.length}</div>
               <p className="text-xs text-muted-foreground">
-                +20.1% from last month
+                All products
               </p>
             </CardContent>
           </Card>
@@ -158,14 +145,14 @@ export default function ProductsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {products.filter((p: Product) => p.isActive).length}
+                {stats?.active || products.filter(p => p.is_active).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {((products.filter((p: Product) => p.isActive).length / products.length) * 100).toFixed(1)}% of total
+                Available for sale
               </p>
             </CardContent>
           </Card>
@@ -177,128 +164,120 @@ export default function ProductsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(products.reduce((sum: number, p: Product) => sum + p.price, 0))}
+                ₹{(stats?.totalValue || products.reduce((sum, p) => sum + p.price, 0)).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                Average: {formatCurrency(products.reduce((sum: number, p: Product) => sum + p.price, 0) / products.length)}
+                Inventory value
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categories</CardTitle>
-              <Hash className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Average Price</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Set(products.map((p: Product) => p.categoryId)).size}
+                ₹{(stats?.averagePrice || (products.length > 0 ? products.reduce((sum, p) => sum + p.price, 0) / products.length : 0)).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                Unique categories
+                Per product
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
+        {/* Filters and Search */}
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Search and filter products</CardDescription>
+            <CardTitle>Products</CardTitle>
+            <CardDescription>
+              Showing {products.length} products
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="flex-1">
-                <Input
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
-                  <SelectItem value="gold">Gold Jewellery</SelectItem>
-                  <SelectItem value="diamond">Diamond Jewellery</SelectItem>
-                  <SelectItem value="silver">Silver Jewellery</SelectItem>
-                  <SelectItem value="platinum">Platinum Jewellery</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleSearch}>
-                <Search className="w-4 h-4 mr-2" />
+              <Button onClick={fetchProducts} variant="outline">
+                <Search className="h-4 w-4 mr-2" />
                 Search
               </Button>
-              <Button variant="outline" onClick={handleRefresh}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Products Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Products</CardTitle>
-            <CardDescription>
-              Showing {products.length} of {total} products
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            {/* Products Table */}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Product</th>
-                    <th className="text-left p-2">SKU</th>
-                    <th className="text-left p-2">Category</th>
-                    <th className="text-left p-2">Price</th>
-                    <th className="text-left p-2">Status</th>
-                    <th className="text-left p-2">Actions</th>
+                    <th className="text-left p-2 font-medium">Product</th>
+                    <th className="text-left p-2 font-medium">Price</th>
+                    <th className="text-left p-2 font-medium">Material</th>
+                    <th className="text-left p-2 font-medium">Status</th>
+                    <th className="text-left p-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product: Product) => (
+                  {products.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
                       <td className="p-2">
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-gray-500">{product.description}</div>
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <Package className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <div className="text-sm text-gray-500">{product.description}</div>
+                          </div>
                         </div>
                       </td>
-                      <td className="p-2 text-sm">{product.sku}</td>
-                      <td className="p-2 text-sm">{product.categoryId}</td>
-                      <td className="p-2 font-medium">{formatCurrency(product.price)}</td>
                       <td className="p-2">
-                        <Badge className={getStatusColor(product.isActive ? 'active' : 'inactive')}>
-                          {product.isActive ? 'Active' : 'Inactive'}
+                        <div className="font-medium">₹{product.price.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500">Cost: ₹{product.cost_price.toLocaleString()}</div>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-sm">
+                          {product.material} {product.gemstone && `• ${product.gemstone}`}
+                        </div>
+                        {product.weight && (
+                          <div className="text-xs text-gray-500">{product.weight}g</div>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <Badge className={getStatusColor(product.is_active)}>
+                          {product.is_active ? 'ACTIVE' : 'INACTIVE'}
                         </Badge>
                       </td>
                       <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
-                            <Eye className="w-4 h-4" />
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="outline">
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            <Edit className="w-4 h-4" />
+                          <Button size="sm" variant="outline">
+                            <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
-                            <Trash2 className="w-4 h-4" />
+                          <Button size="sm" variant="outline" className="text-red-600">
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -307,6 +286,13 @@ export default function ProductsPage() {
                 </tbody>
               </table>
             </div>
+
+            {products.length === 0 && (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No products found</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

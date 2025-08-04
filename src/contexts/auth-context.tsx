@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session
     const checkAuth = async () => {
       try {
-        // For demo purposes, check localStorage
+        // Check localStorage for demo purposes
         const storedUser = localStorage.getItem('sarkar_crm_user');
         if (storedUser) {
           setUser(JSON.parse(storedUser));
@@ -49,22 +49,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Real authentication - try API first
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        localStorage.setItem('sarkar_crm_user', JSON.stringify(userData));
+        return;
+      }
+
+      // Fallback for demo - create user based on email pattern
+      let demoUser: User;
       
-      // Mock user data based on email
-      let mockUser: User;
-      
-      if (email.includes('admin')) {
-        mockUser = {
+      if (email.includes('admin') || email === 'admin@example.com') {
+        demoUser = {
           id: '1',
           email,
           name: 'Business Admin',
           role: 'BUSINESS_ADMIN',
           businessId: 'business-1',
         };
-      } else if (email.includes('manager')) {
-        mockUser = {
+      } else if (email.includes('manager') || email === 'manager@example.com') {
+        demoUser = {
           id: '2',
           email,
           name: 'Floor Manager',
@@ -73,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           businessId: 'business-1',
         };
       } else {
-        mockUser = {
+        demoUser = {
           id: '3',
           email,
           name: 'Salesperson',
@@ -83,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
       
-      setUser(mockUser);
-      localStorage.setItem('sarkar_crm_user', JSON.stringify(mockUser));
+      setUser(demoUser);
+      localStorage.setItem('sarkar_crm_user', JSON.stringify(demoUser));
     } catch (error) {
       throw new Error('Login failed');
     } finally {

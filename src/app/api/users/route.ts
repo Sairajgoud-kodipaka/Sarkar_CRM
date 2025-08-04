@@ -25,28 +25,28 @@ export async function GET(request: NextRequest) {
     }
 
     // Get users with pagination
-    const users = await prisma.user.findMany({
+    const users = await prisma.users.findMany({
       where,
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        isActive: true,
-        storeId: true,
-        floorId: true,
-        createdAt: true,
-        updatedAt: true
+        is_active: true,
+        store_id: true,
+        floor_id: true,
+        created_at: true,
+        updated_at: true
       },
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       skip: offset,
       take: limit
     });
 
     // Get total count for pagination
-    const total = await prisma.user.count({ where });
+    const total = await prisma.users.count({ where });
 
     return NextResponse.json({
       success: true,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { email }
     });
 
@@ -101,26 +101,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
         name,
         email,
         password, // Note: In production, hash the password
         role: role || 'FLOOR_MANAGER',
-        isActive: true,
-        storeId: storeId || null,
-        floorId: floorId || null
+        is_active: true,
+        store_id: storeId || null,
+        floor_id: floorId || null
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        isActive: true,
-        storeId: true,
-        floorId: true,
-        createdAt: true,
-        updatedAt: true
+        is_active: true,
+        store_id: true,
+        floor_id: true,
+        created_at: true,
+        updated_at: true
       }
     });
 

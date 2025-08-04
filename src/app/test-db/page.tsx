@@ -11,7 +11,7 @@ export default function TestDB() {
     async function testConnection() {
       try {
         // Test the connection by trying to get stores
-        const stores = await prisma.store.findMany({
+        const stores = await prisma.stores.findMany({
           take: 5
         });
         

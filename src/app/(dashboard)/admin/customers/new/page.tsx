@@ -189,15 +189,53 @@ export default function AddCustomerPage() {
   const onSubmit = async (data: CustomerFormData) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Customer data:', data);
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/admin/customers');
-      }, 1500);
-    } catch (error) {
+      // Prepare customer data for API
+      const customerData = {
+        name: data.fullName,
+        email: data.email || '',
+        phone: data.phoneNumber,
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+        dateOfBirth: data.birthDate || '',
+        gender: '',
+        occupation: '',
+        incomeRange: '',
+        socialCircle: data.community,
+        occasions: data.reasonForVisit,
+        budgetRange: '',
+        notes: data.notes || '',
+        status: 'ACTIVE',
+        floorId: '1',
+        assignedToId: data.assignedSalesperson
+      };
+
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(customerData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/admin/customers');
+        }, 1500);
+      } else {
+        throw new Error(result.error || 'Failed to create customer');
+      }
+    } catch (error: any) {
       console.error('Error adding customer:', error);
+      alert(`Error: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
