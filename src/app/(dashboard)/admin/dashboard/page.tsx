@@ -77,28 +77,28 @@ export default function AdminDashboard() {
     data: analyticsData, 
     loading: analyticsLoading, 
     error: analyticsError,
-    retry: retryAnalytics
+    refetch: retryAnalytics
   } = useAnalytics('dashboard');
   
   const { 
     data: customers, 
     loading: customersLoading, 
     error: customersError,
-    retry: retryCustomers
+    refetch: retryCustomers
   } = useCustomers({ limit: 10 });
   
   const { 
     data: sales, 
     loading: salesLoading, 
     error: salesError,
-    retry: retrySales
+    refetch: retrySales
   } = useSales({ limit: 10 });
   
   const { 
     data: products, 
     loading: productsLoading, 
     error: productsError,
-    retry: retryProducts
+    refetch: retryProducts
   } = useProducts({ limit: 10 });
 
   // Loading and error states
@@ -447,7 +447,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {sales?.slice(0, 5).map((sale: any) => (
+              {sales?.slice(0, 5).map((sale: any, index: number) => (
                 <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center space-x-4">
                     <div className="p-2 bg-green-100 rounded-full">

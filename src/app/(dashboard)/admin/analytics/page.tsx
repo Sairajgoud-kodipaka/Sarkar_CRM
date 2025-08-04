@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ErrorMessage } from '@/components/ui/error-message';
-import { useAnalytics } from '@/hooks/useAnalytics';
+import { useAnalytics } from '@/hooks/useRealData';
 import {
   BarChart3,
   TrendingUp,
@@ -45,12 +45,36 @@ import {
   Legend
 } from 'recharts';
 
+// Type definitions
+interface AnalyticsData {
+  sales?: {
+    salesByMonth?: Array<{ month: string; sales: number }>;
+    totalRevenue?: number;
+    totalSales?: number;
+    topCustomers?: Array<{ name: string; orders: number; totalSpent: number }>;
+  };
+  products?: {
+    productsByCategory?: Array<{ category: string; count: number }>;
+    topSellingProducts?: Array<{ name: string; sales: number; revenue: number }>;
+  };
+  customers?: {
+    totalCustomers?: number;
+    customerGrowth?: Array<{ month: string; newCustomers: number }>;
+  };
+}
+
+interface PieDataItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
 export default function AdminAnalytics() {
   const [timeframe, setTimeframe] = useState('month');
   const [chartType, setChartType] = useState('line');
 
   // Real data hooks
-  const { analytics, loading, error, fetchSalesAnalytics, fetchCustomerAnalytics, fetchProductAnalytics } = useAnalytics();
+  const { data: analytics, loading, error, refetch } = useAnalytics('dashboard');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -61,8 +85,8 @@ export default function AdminAnalytics() {
   };
 
   // Process real data
-  const salesData = analytics.sales?.salesByMonth || [];
-  const pieData = analytics.products?.productsByCategory?.map(cat => ({
+  const salesData = (analytics as AnalyticsData)?.sales?.salesByMonth || [];
+  const pieData: PieDataItem[] = (analytics as AnalyticsData)?.products?.productsByCategory?.map((cat: { category: string; count: number }) => ({
     name: cat.category,
     value: cat.count,
     color: getCategoryColor(cat.category)
@@ -71,21 +95,21 @@ export default function AdminAnalytics() {
   const metrics = [
     {
       title: 'Total Revenue',
-      value: formatCurrency(analytics.sales?.totalRevenue || 0),
+      value: formatCurrency((analytics as AnalyticsData)?.sales?.totalRevenue || 0),
       change: '+12.5%',
       changeType: 'positive' as const,
       icon: DollarSign,
     },
     {
       title: 'Total Customers',
-      value: (analytics.customers?.totalCustomers || 0).toString(),
+      value: ((analytics as AnalyticsData)?.customers?.totalCustomers || 0).toString(),
       change: '+8.2%',
       changeType: 'positive' as const,
       icon: Users,
     },
     {
       title: 'Products Sold',
-      value: (analytics.sales?.totalSales || 0).toString(),
+      value: ((analytics as AnalyticsData)?.sales?.totalSales || 0).toString(),
       change: '+15.3%',
       changeType: 'positive' as const,
       icon: ShoppingBag,
@@ -234,7 +258,7 @@ export default function AdminAnalytics() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {pieData.map((entry, index) => (
+                    {pieData.map((entry: PieDataItem, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -255,7 +279,7 @@ export default function AdminAnalytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analytics.products?.topSellingProducts?.slice(0, 5).map((product, index) => (
+                {(analytics as AnalyticsData)?.products?.topSellingProducts?.slice(0, 5).map((product: { name: string; sales: number; revenue: number }, index: number) => (
                   <div key={index} className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{product.name}</p>
@@ -278,7 +302,7 @@ export default function AdminAnalytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analytics.sales?.topCustomers?.slice(0, 5).map((customer, index) => (
+                {(analytics as AnalyticsData)?.sales?.topCustomers?.slice(0, 5).map((customer: { name: string; orders: number; totalSpent: number }, index: number) => (
                   <div key={index} className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{customer.name}</p>
@@ -301,7 +325,7 @@ export default function AdminAnalytics() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={analytics.customers?.customerGrowth || []}>
+                <BarChart data={(analytics as AnalyticsData)?.customers?.customerGrowth || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />

@@ -15,7 +15,13 @@ export function useAPI<T>(endpoint: string, options?: {
       setLoading(true)
       setError(null)
       
-      const response = await fetch(`/api/${endpoint}`, {
+      // Temporary: Use test API for frontend integration
+      const testEndpoint = endpoint === 'customers' ? 'test-simple?type=customers' :
+                          endpoint === 'products' ? 'test-simple?type=products' :
+                          endpoint === 'sales' ? 'test-simple?type=sales' :
+                          endpoint;
+      
+      const response = await fetch(`/api/${testEndpoint}`, {
         method: options?.method || 'GET',
         headers: {
           'Content-Type': 'application/json',

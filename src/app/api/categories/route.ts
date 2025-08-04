@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const storeId = searchParams.get('storeId') || '550e8400-e29b-41d4-a716-446655440000';
 
-    const categories = await prisma.category.findMany({
+    const categories = await prisma.categories.findMany({
       where: {
-        storeId,
-        isActive: true
+        store_id: storeId,
+        is_active: true
       },
       orderBy: {
         name: 'asc'
@@ -43,13 +41,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const category = await prisma.category.create({
+    const category = await prisma.categories.create({
       data: {
         name,
         description,
-        parentId,
-        storeId,
-        isActive: true
+        parent_id: parentId,
+        store_id: storeId,
+        is_active: true
       }
     });
 

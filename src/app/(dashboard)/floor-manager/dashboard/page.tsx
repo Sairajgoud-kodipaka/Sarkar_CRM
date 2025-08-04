@@ -1,60 +1,44 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Package, 
-  TrendingUp, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Star, 
-  Mail,
-  ChevronDown
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { useCustomers, useProducts, useSales } from '@/hooks/useRealData';
+import {
+  Users,
+  Package,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Calendar,
+  Clock,
+  Star,
+  Eye,
+  Plus,
+  RefreshCw
 } from 'lucide-react';
 
-// Mock data for floor manager dashboard
-const visitorMetrics = {
-  today: 45,
-  thisWeek: 234,
-  thisMonth: 892
-};
-
-const salesMetrics = {
-  today: 125000,
-  thisWeek: 450000,
-  thisMonth: 1850000
-};
-
-const floorCustomers = {
-  floor1: [
-    { name: 'Priya Sharma', number: '+91 98765 43210', interest: 'Gold Necklace' },
-    { name: 'Amit Patel', number: '+91 87654 32109', interest: 'Diamond Ring' },
-    { name: 'Kavya Singh', number: '+91 76543 21098', interest: 'Silver Bracelet' },
-    { name: 'Rahul Verma', number: '+91 65432 10987', interest: 'Platinum Chain' }
-  ],
-  floor2: [
-    { name: 'Neha Gupta', number: '+91 54321 09876', interest: 'Pearl Set' },
-    { name: 'Vikram Malhotra', number: '+91 43210 98765', interest: 'Ruby Earrings' },
-    { name: 'Sneha Reddy', number: '+91 32109 87654', interest: 'Emerald Ring' },
-    { name: 'Rajesh Kumar', number: '+91 21098 76543', interest: 'Sapphire Necklace' }
-  ],
-  floor3: [
-    { name: 'Anjali Desai', number: '+91 10987 65432', interest: 'Gold Bangle' },
-    { name: 'Mohan Singh', number: '+91 09876 54321', interest: 'Diamond Pendant' },
-    { name: 'Pooja Sharma', number: '+91 98765 43210', interest: 'Silver Ring' },
-    { name: 'Arjun Mehta', number: '+91 87654 32109', interest: 'Platinum Earrings' }
-  ]
-};
-
 export default function FloorManagerDashboard() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('day');
+  const [currentFloor] = useState('Floor 1'); // In real app, get from auth context
+  const [timeRange, setTimeRange] = useState('today');
+
+  // Real data hooks
+  const { data: customersResponse, loading: customersLoading, error: customersError } = useCustomers({ limit: 10 });
+  const { data: productsResponse, loading: productsLoading, error: productsError } = useProducts({ limit: 10 });
+  const { data: salesResponse, loading: salesLoading, error: salesError } = useSales({ limit: 10 });
+
+  const customers = customersResponse?.data || [];
+  const products = productsResponse?.data || [];
+  const sales = salesResponse?.data || [];
+
+  const loading = customersLoading || productsLoading || salesLoading;
+  const error = customersError || productsError || salesError;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -64,257 +48,226 @@ export default function FloorManagerDashboard() {
     }).format(amount);
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800';
+      case 'INACTIVE':
+        return 'bg-red-100 text-red-800';
+      case 'COMPLETED':
+        return 'bg-blue-100 text-blue-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <LoadingSpinner text="Loading floor manager dashboard..." />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <ErrorMessage error={error} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <DashboardLayout userRole="FLOOR_MANAGER" userFloor="Floor 1">
-      <PageHeader
-        title="Floor Manager Dashboard"
-        description="Manage your floor operations and track performance"
-        breadcrumbs={true}
-        actions={
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Package className="mr-2 h-4 w-4" />
-              View Reports
-            </Button>
-            <Button size="sm">
-              <Mail className="mr-2 h-4 w-4" />
-              Add Customer
-            </Button>
-          </div>
-        }
-      />
+    <DashboardLayout>
+      <div className="p-6">
+        <PageHeader
+          title={`${currentFloor} Dashboard`}
+          description="Manage your floor operations and performance"
+          breadcrumbs={true}
+          actions={[
+            {
+              label: 'Add Customer',
+              icon: Plus,
+              onClick: () => console.log('Add customer'),
+              variant: 'default'
+            }
+          ]}
+        />
 
-      {/* 3x3 Grid Dashboard Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Top Row - Visitor Metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">How many people visited today</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary-600">{visitorMetrics.today}</div>
-              <p className="text-sm text-gray-600 mt-2">Unique visitors</p>
+              <div className="text-2xl font-bold">{customers.length}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">+12%</span> from last month
+              </p>
             </CardContent>
           </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">How many people visited this week</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Products</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary-600">{visitorMetrics.thisWeek}</div>
-              <p className="text-sm text-gray-600 mt-2">Weekly visitors</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">How many people visited this month</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary-600">{visitorMetrics.thisMonth}</div>
-              <p className="text-sm text-gray-600 mt-2">Monthly visitors</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Middle Row - Sales Metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Sales today</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{formatCurrency(salesMetrics.today)}</div>
-              <p className="text-sm text-gray-600 mt-2">Daily revenue</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Sales this week</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{formatCurrency(salesMetrics.thisWeek)}</div>
-              <p className="text-sm text-gray-600 mt-2">Weekly revenue</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Sales this month</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{formatCurrency(salesMetrics.thisMonth)}</div>
-              <p className="text-sm text-gray-600 mt-2">Monthly revenue</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Bottom Row - Floor Customers */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Floor 1 customers</CardTitle>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+              <div className="text-2xl font-bold">
+                {products.filter(p => p.is_active).length}
               </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                  <SelectTrigger className="w-24 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                {products.length} total products
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="text-xs font-medium text-gray-500 flex justify-between">
-                  <span>Name</span>
-                  <span>Number</span>
-                  <span>Interest</span>
-                </div>
-                {floorCustomers.floor1.map((customer, index) => (
-                  <div key={index} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
-                    <span className="font-medium">{customer.name}</span>
-                    <span className="text-gray-600">{customer.number}</span>
-                    <span className="text-gray-500">{customer.interest}</span>
+              <div className="text-2xl font-bold">
+                {formatCurrency(sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sales.length} transactions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Performance</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">94%</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">+2.1%</span> from last week
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Recent Customers */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Customers</CardTitle>
+              <CardDescription>
+                Latest customer interactions on your floor
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {customers.slice(0, 5).map((customer) => (
+                  <div key={customer.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{customer.name}</div>
+                        <div className="text-sm text-gray-500">{customer.email}</div>
+                      </div>
+                    </div>
+                    <Badge className={getStatusColor(customer.status)}>
+                      {customer.status}
+                    </Badge>
                   </div>
                 ))}
               </div>
+              <Button variant="outline" className="w-full mt-4">
+                <Eye className="h-4 w-4 mr-2" />
+                View All Customers
+              </Button>
             </CardContent>
           </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
+          {/* Recent Sales */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Floor 2 customers</CardTitle>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                  <SelectTrigger className="w-24 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <CardTitle>Recent Sales</CardTitle>
+              <CardDescription>
+                Latest transactions on your floor
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="text-xs font-medium text-gray-500 flex justify-between">
-                  <span>Name</span>
-                  <span>Number</span>
-                  <span>Interest</span>
-                </div>
-                {floorCustomers.floor2.map((customer, index) => (
-                  <div key={index} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
-                    <span className="font-medium">{customer.name}</span>
-                    <span className="text-gray-600">{customer.number}</span>
-                    <span className="text-gray-500">{customer.interest}</span>
+              <div className="space-y-4">
+                {sales.slice(0, 5).map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">
+                          {sale.customer?.name || 'Customer'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {sale.product?.name || 'Product'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatCurrency(sale.total_amount || 0)}
+                      </div>
+                      <Badge className={getStatusColor(sale.status)}>
+                        {sale.status}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
+              <Button variant="outline" className="w-full mt-4">
+                <Eye className="h-4 w-4 mr-2" />
+                View All Sales
+              </Button>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Floor 3 customers</CardTitle>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                  <SelectTrigger className="w-24 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="text-xs font-medium text-gray-500 flex justify-between">
-                  <span>Name</span>
-                  <span>Number</span>
-                  <span>Interest</span>
-                </div>
-                {floorCustomers.floor3.map((customer, index) => (
-                  <div key={index} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
-                    <span className="font-medium">{customer.name}</span>
-                    <span className="text-gray-600">{customer.number}</span>
-                    <span className="text-gray-500">{customer.interest}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>
+              Common tasks for floor management
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button variant="outline" className="h-20 flex-col">
+                <Users className="h-6 w-6 mb-2" />
+                <span className="text-sm">Add Customer</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <Package className="h-6 w-6 mb-2" />
+                <span className="text-sm">View Products</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <DollarSign className="h-6 w-6 mb-2" />
+                <span className="text-sm">Record Sale</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <Target className="h-6 w-6 mb-2" />
+                <span className="text-sm">Performance</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

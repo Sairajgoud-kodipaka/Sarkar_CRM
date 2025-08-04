@@ -1,459 +1,302 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout';
 import { PageHeader } from '@/components/layout/page-header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  MoreHorizontal, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Phone, 
-  Mail, 
-  Calendar,
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { useCustomers } from '@/hooks/useRealData';
+import {
+  Search,
+  Filter,
+  Plus,
   Download,
   Upload,
   RefreshCw,
+  Eye,
+  Edit,
+  Trash2,
+  User,
+  Mail,
+  Phone,
   MapPin,
-  Clock,
-  Star
+  Calendar,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
-// Mock data for floor-specific customers
-const mockFloorCustomers = [
-  {
-    id: 1,
-    name: 'Rahul Sharma',
-    phone: '+91 98765 43210',
-    email: 'rahul.sharma@email.com',
-    status: 'active',
-    lastVisit: '2024-01-15',
-    totalPurchases: 45000,
-    followUpDate: '2024-01-20',
-    assignedTo: 'Priya Patel',
-    priority: 'high',
-    visitCount: 5,
-    avgSpend: 9000,
-  },
-  {
-    id: 2,
-    name: 'Priya Patel',
-    phone: '+91 87654 32109',
-    email: 'priya.patel@email.com',
-    status: 'pending',
-    lastVisit: '2024-01-10',
-    totalPurchases: 0,
-    followUpDate: '2024-01-18',
-    assignedTo: 'Amit Kumar',
-    priority: 'medium',
-    visitCount: 2,
-    avgSpend: 0,
-  },
-  {
-    id: 3,
-    name: 'Amit Kumar',
-    phone: '+91 76543 21098',
-    email: 'amit.kumar@email.com',
-    status: 'active',
-    lastVisit: '2024-01-12',
-    totalPurchases: 125000,
-    followUpDate: '2024-01-25',
-    assignedTo: 'Priya Patel',
-    priority: 'high',
-    visitCount: 8,
-    avgSpend: 15625,
-  },
-  {
-    id: 4,
-    name: 'Neha Singh',
-    phone: '+91 65432 10987',
-    email: 'neha.singh@email.com',
-    status: 'inactive',
-    lastVisit: '2023-12-20',
-    totalPurchases: 78000,
-    followUpDate: null,
-    assignedTo: 'Rajesh Verma',
-    priority: 'low',
-    visitCount: 3,
-    avgSpend: 26000,
-  },
-  {
-    id: 5,
-    name: 'Rajesh Verma',
-    phone: '+91 54321 09876',
-    email: 'rajesh.verma@email.com',
-    status: 'active',
-    lastVisit: '2024-01-14',
-    totalPurchases: 92000,
-    followUpDate: '2024-01-22',
-    assignedTo: 'Amit Kumar',
-    priority: 'medium',
-    visitCount: 6,
-    avgSpend: 15333,
-  },
-];
-
-export default function FloorManagerCustomersPage() {
+export default function FloorManagerCustomers() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [customers, setCustomers] = useState(mockFloorCustomers);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [floorFilter, setFloorFilter] = useState('');
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    // TODO: Implement actual search logic
-    console.log('Search query:', query);
-  };
+  // Real data hooks
+  const { 
+    data: customersResponse, 
+    loading, 
+    error, 
+    refetch 
+  } = useCustomers({ search: searchQuery, status: statusFilter, floor: floorFilter, limit: 50 });
 
-  const getStatusBadge = (status: string) => {
+  const customers = customersResponse?.data || [];
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return <Badge className="bg-success-100 text-success-700">Active</Badge>;
-      case 'pending':
-        return <Badge className="bg-warning-100 text-warning-700">Pending</Badge>;
-      case 'inactive':
-        return <Badge className="bg-error-100 text-error-700">Inactive</Badge>;
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800';
+      case 'INACTIVE':
+        return 'bg-red-100 text-red-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <Badge className="bg-error-100 text-error-700">High</Badge>;
-      case 'medium':
-        return <Badge className="bg-warning-100 text-warning-700">Medium</Badge>;
-      case 'low':
-        return <Badge className="bg-success-100 text-success-700">Low</Badge>;
-      default:
-        return <Badge variant="secondary">{priority}</Badge>;
-    }
+  const handleSearch = () => {
+    refetch();
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
+  const handleRefresh = () => {
+    refetch();
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN');
-  };
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <LoadingSpinner text="Loading customers..." />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         customer.phone.includes(searchQuery);
-    const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || customer.priority === priorityFilter;
-    
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <ErrorMessage error={error} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <DashboardLayout
-      userRole="FLOOR_MANAGER"
-      userFloor="Floor 1"
-      searchPlaceholder="Search customers by name, email, or phone..."
-      onSearch={handleSearch}
-    >
-      <PageHeader
-        title="Floor 1 Customers"
-        description="Manage customers assigned to Floor 1 - Gold & Diamond"
-        breadcrumbs={true}
-        actions={
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <Link href="/floor-manager/customers/new">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Customer
+    <DashboardLayout>
+      <div className="p-6">
+        <PageHeader
+          title="Floor Customers"
+          description="Manage customers on your floor"
+          breadcrumbs={true}
+          actions={[
+            {
+              label: 'Add Customer',
+              icon: Plus,
+              onClick: () => console.log('Add customer'),
+              variant: 'default'
+            }
+          ]}
+        />
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+              <User className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{customers.length}</div>
+              <p className="text-xs text-muted-foreground">
+                On your floor
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {customers.filter(c => c.status === 'ACTIVE').length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {((customers.filter(c => c.status === 'ACTIVE').length / customers.length) * 100).toFixed(1)}% of total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">New This Month</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {customers.filter(c => {
+                  const created = new Date(c.created_at);
+                  const now = new Date();
+                  return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                }).length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Recent additions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Follow-ups</CardTitle>
+              <XCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {customers.filter(c => c.status === 'PENDING').length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Need attention
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Search */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Customers</CardTitle>
+            <CardDescription>
+              Showing {customers.length} customers on your floor
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search customers..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={floorFilter} onValueChange={setFloorFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="All Floors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Floors</SelectItem>
+                  <SelectItem value="Floor 1">Floor 1</SelectItem>
+                  <SelectItem value="Floor 2">Floor 2</SelectItem>
+                  <SelectItem value="Floor 3">Floor 3</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleSearch} variant="outline">
+                <Search className="h-4 w-4 mr-2" />
+                Search
               </Button>
-            </Link>
-          </div>
-        }
-      />
-
-      {/* Floor-specific Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Floor Customers</p>
-                <p className="text-2xl font-bold text-navy-900">{customers.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary-600" />
-              </div>
+              <Button onClick={handleRefresh} variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Active Customers</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {customers.filter(c => c.status === 'active').length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-success-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Pending Follow-ups</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {customers.filter(c => c.followUpDate && new Date(c.followUpDate) <= new Date()).length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-warning-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Floor Revenue</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {formatCurrency(customers.reduce((sum, c) => sum + c.totalPurchases, 0))}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-navy-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-navy-600" />
-              </div>
+            {/* Customers Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 font-medium">Customer</th>
+                    <th className="text-left p-2 font-medium">Contact</th>
+                    <th className="text-left p-2 font-medium">Location</th>
+                    <th className="text-left p-2 font-medium">Status</th>
+                    <th className="text-left p-2 font-medium">Created</th>
+                    <th className="text-left p-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((customer) => (
+                    <tr key={customer.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <User className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{customer.name}</div>
+                            <div className="text-sm text-gray-500">ID: {customer.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <Mail className="h-3 w-3 mr-2 text-gray-400" />
+                            {customer.email}
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-3 w-3 mr-2 text-gray-400" />
+                            {customer.phone}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex items-center text-sm">
+                          <MapPin className="h-3 w-3 mr-2 text-gray-400" />
+                          {customer.city}, {customer.state}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <Badge className={getStatusColor(customer.status)}>
+                          {customer.status}
+                        </Badge>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-sm">
+                          {new Date(customer.created_at).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex space-x-2">
+                          <Button size="sm" variant="outline">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Filters and Search */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-navy-400" />
-                <Input
-                  placeholder="Search customers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Priority</label>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Actions</label>
-              <Button variant="outline" className="w-full">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Customers Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Floor 1 Customer List</CardTitle>
-              <CardDescription>
-                Showing {filteredCustomers.length} of {customers.length} customers
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="outline" className="bg-primary-50 text-primary-700">
-                Floor 1 - Gold & Diamond
-              </Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Last Visit</TableHead>
-                  <TableHead>Total Purchases</TableHead>
-                  <TableHead>Follow-up</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead>Performance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-navy-900">{customer.name}</p>
-                        <p className="text-sm text-navy-600">ID: {customer.id}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Phone className="mr-1 h-3 w-3 text-navy-400" />
-                          {customer.phone}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="mr-1 h-3 w-3 text-navy-400" />
-                          {customer.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(customer.status)}
-                    </TableCell>
-                    <TableCell>
-                      {getPriorityBadge(customer.priority)}
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(customer.lastVisit)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium text-navy-900">
-                        {formatCurrency(customer.totalPurchases)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {customer.followUpDate ? (
-                        <div className="flex items-center text-sm">
-                          <Calendar className="mr-1 h-3 w-3 text-navy-400" />
-                          {formatDate(customer.followUpDate)}
-                        </div>
-                      ) : (
-                        <span className="text-navy-400">No follow-up</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-navy-600">{customer.assignedTo}</span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <MapPin className="mr-1 h-3 w-3 text-navy-400" />
-                          {customer.visitCount} visits
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Star className="mr-1 h-3 w-3 text-navy-400" />
-                          {formatCurrency(customer.avgSpend)} avg
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Customer
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Phone className="mr-2 h-4 w-4" />
-                            Call Customer
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="mr-2 h-4 w-4" />
-                            Schedule Follow-up
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-error-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Customer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </DashboardLayout>
   );
 } 

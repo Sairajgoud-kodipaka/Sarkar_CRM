@@ -1,372 +1,273 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
-import { useAuth } from '@/contexts/auth-context';
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  Target, 
-  Calendar, 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { useCustomers, useProducts, useSales } from '@/hooks/useRealData';
+import {
+  Users,
+  Package,
+  DollarSign,
+  TrendingUp,
+  Target,
+  Calendar,
   Star,
-  ShoppingCart,
-  UserCheck,
+  Eye,
+  Plus,
+  RefreshCw,
   Award,
-  Activity
+  ShoppingCart
 } from 'lucide-react';
 
-// Mock data for salesperson dashboard
-const mockSalespersonData = {
-  id: 'SP001',
-  name: 'Sarah Johnson',
-  floor: 'Floor 2',
-  role: 'SALESPERSON',
-  stats: {
-    totalSales: 45,
-    totalRevenue: 125000,
-    monthlyTarget: 150000,
-    customersServed: 23,
-    averageRating: 4.8,
-    salesThisWeek: 12,
-    salesThisMonth: 28
-  },
-  recentSales: [
-    {
-      id: 'SALE-001',
-      customerName: 'John Smith',
-      amount: 2500,
-      product: 'Diamond Ring',
-      date: '2024-12-15T14:30:00Z',
-      status: 'COMPLETED'
-    },
-    {
-      id: 'SALE-002',
-      customerName: 'Emma Wilson',
-      amount: 1800,
-      product: 'Gold Necklace',
-      date: '2024-12-15T11:20:00Z',
-      status: 'COMPLETED'
-    },
-    {
-      id: 'SALE-003',
-      customerName: 'Michael Brown',
-      amount: 3200,
-      product: 'Platinum Watch',
-      date: '2024-12-14T16:45:00Z',
-      status: 'COMPLETED'
-    }
-  ],
-  recentCustomers: [
-    {
-      id: 'CUST-001',
-      name: 'John Smith',
-      email: 'john@example.com',
-      phone: '+1234567890',
-      lastVisit: '2024-12-15T14:30:00Z',
-      totalSpent: 2500,
-      status: 'ACTIVE'
-    },
-    {
-      id: 'CUST-002',
-      name: 'Emma Wilson',
-      email: 'emma@example.com',
-      phone: '+1234567891',
-      lastVisit: '2024-12-15T11:20:00Z',
-      totalSpent: 1800,
-      status: 'ACTIVE'
-    },
-    {
-      id: 'CUST-003',
-      name: 'Michael Brown',
-      email: 'michael@example.com',
-      phone: '+1234567892',
-      lastVisit: '2024-12-14T16:45:00Z',
-      totalSpent: 3200,
-      status: 'ACTIVE'
-    }
-  ],
-  performance: {
-    weeklyGoal: 15,
-    weeklyAchieved: 12,
-    monthlyGoal: 35,
-    monthlyAchieved: 28,
-    customerSatisfaction: 4.8,
-    averageTransactionValue: 2778
-  }
-};
-
 export default function SalespersonDashboard() {
-  const { user } = useAuth();
-  const [salespersonData, setSalespersonData] = useState(mockSalespersonData);
+  const [currentUser] = useState('Salesperson'); // In real app, get from auth context
 
-  // Calculate progress percentages
-  const weeklyProgress = (salespersonData.performance.weeklyAchieved / salespersonData.performance.weeklyGoal) * 100;
-  const monthlyProgress = (salespersonData.performance.monthlyAchieved / salespersonData.performance.monthlyGoal) * 100;
-  const targetProgress = (salespersonData.stats.totalRevenue / salespersonData.stats.monthlyTarget) * 100;
+  // Real data hooks
+  const { data: customersResponse, loading: customersLoading, error: customersError } = useCustomers({ limit: 10 });
+  const { data: productsResponse, loading: productsLoading, error: productsError } = useProducts({ limit: 10 });
+  const { data: salesResponse, loading: salesLoading, error: salesError } = useSales({ limit: 10 });
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      COMPLETED: { variant: 'default', color: 'text-green-600' },
-      PENDING: { variant: 'secondary', color: 'text-orange-600' },
-      CANCELLED: { variant: 'destructive', color: 'text-red-600' },
-      ACTIVE: { variant: 'default', color: 'text-green-600' },
-      INACTIVE: { variant: 'secondary', color: 'text-gray-600' }
-    };
+  const customers = customersResponse?.data || [];
+  const products = productsResponse?.data || [];
+  const sales = salesResponse?.data || [];
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.COMPLETED;
+  const loading = customersLoading || productsLoading || salesLoading;
+  const error = customersError || productsError || salesError;
 
-    return (
-      <Badge variant={config.variant as any} className={config.color}>
-        {status}
-      </Badge>
-    );
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
   };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800';
+      case 'INACTIVE':
+        return 'bg-red-100 text-red-800';
+      case 'COMPLETED':
+        return 'bg-blue-100 text-blue-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <LoadingSpinner text="Loading salesperson dashboard..." />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <ErrorMessage error={error} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
-      <PageHeader
-        title="Sales Dashboard"
-        description={`Welcome back, ${salespersonData.name}! Track your performance and recent activities.`}
-        breadcrumbs={true}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              View Schedule
-            </Button>
-            <Button className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Record Sale
-            </Button>
-          </div>
-        }
-      />
+      <div className="p-6">
+        <PageHeader
+          title={`${currentUser} Dashboard`}
+          description="Track your sales performance and manage customers"
+          breadcrumbs={true}
+          actions={[
+            {
+              label: 'New Sale',
+              icon: Plus,
+              onClick: () => console.log('New sale'),
+              variant: 'default'
+            }
+          ]}
+        />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{salespersonData.stats.totalSales}</div>
-            <p className="text-xs text-muted-foreground">
-              +{salespersonData.stats.salesThisWeek} this week
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${salespersonData.stats.totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              ${salespersonData.performance.averageTransactionValue.toLocaleString()} avg per sale
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Customers Served</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{salespersonData.stats.customersServed}</div>
-            <p className="text-xs text-muted-foreground">
-              +{salespersonData.stats.salesThisMonth} this month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rating</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{salespersonData.stats.averageRating}</div>
-            <p className="text-xs text-muted-foreground">
-              Customer satisfaction
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">My Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{customers.length}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">+8%</span> from last month
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Performance Progress */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Weekly Goal Progress</CardTitle>
-            <CardDescription>
-              Sales target: {salespersonData.performance.weeklyGoal}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Achieved: {salespersonData.performance.weeklyAchieved}</span>
-              <span className="text-sm text-muted-foreground">{weeklyProgress.toFixed(1)}%</span>
-            </div>
-            <Progress value={weeklyProgress} className="h-2" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Monthly Goal Progress</CardTitle>
-            <CardDescription>
-              Sales target: {salespersonData.performance.monthlyGoal}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Achieved: {salespersonData.performance.monthlyAchieved}</span>
-              <span className="text-sm text-muted-foreground">{monthlyProgress.toFixed(1)}%</span>
-            </div>
-            <Progress value={monthlyProgress} className="h-2" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Revenue Target</CardTitle>
-            <CardDescription>
-              Target: ${salespersonData.stats.monthlyTarget.toLocaleString()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Achieved: ${salespersonData.stats.totalRevenue.toLocaleString()}</span>
-              <span className="text-sm text-muted-foreground">{targetProgress.toFixed(1)}%</span>
-            </div>
-            <Progress value={targetProgress} className="h-2" />
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Available Products</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {products.filter(p => p.is_active).length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {products.length} total products
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Recent Activity */}
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              Recent Sales
-            </CardTitle>
-            <CardDescription>
-              Your latest sales transactions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {salespersonData.recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <ShoppingCart className="w-5 h-5 text-primary" />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatCurrency(sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sales.length} transactions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Performance</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">96%</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">+3.2%</span> from last week
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* My Customers */}
+          <Card>
+            <CardHeader>
+              <CardTitle>My Customers</CardTitle>
+              <CardDescription>
+                Recent customer interactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {customers.slice(0, 5).map((customer) => (
+                  <div key={customer.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{customer.name}</div>
+                        <div className="text-sm text-gray-500">{customer.email}</div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{sale.customerName}</p>
-                      <p className="text-sm text-muted-foreground">{sale.product}</p>
-                    </div>
+                    <Badge className={getStatusColor(customer.status)}>
+                      {customer.status}
+                    </Badge>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">${sale.amount.toLocaleString()}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(sale.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4" />
-              Recent Customers
-            </CardTitle>
-            <CardDescription>
-              Customers you've served recently
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {salespersonData.recentCustomers.map((customer) => (
-                <div key={customer.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <Users className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{customer.name}</p>
-                      <p className="text-sm text-muted-foreground">{customer.email}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${customer.totalSpent.toLocaleString()}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(customer.lastVisit).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Sales Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Sales History
-          </CardTitle>
-          <CardDescription>
-            Detailed view of your sales transactions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sale ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salespersonData.recentSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">{sale.id}</TableCell>
-                    <TableCell>{sale.customerName}</TableCell>
-                    <TableCell>{sale.product}</TableCell>
-                    <TableCell>${sale.amount.toLocaleString()}</TableCell>
-                    <TableCell>
-                      {new Date(sale.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(sale.status)}
-                    </TableCell>
-                  </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+              <Button variant="outline" className="w-full mt-4">
+                <Eye className="h-4 w-4 mr-2" />
+                View All Customers
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Recent Sales */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Sales</CardTitle>
+              <CardDescription>
+                Your latest transactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {sales.slice(0, 5).map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <ShoppingCart className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">
+                          {sale.customer?.name || 'Customer'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {sale.product?.name || 'Product'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatCurrency(sale.total_amount || 0)}
+                      </div>
+                      <Badge className={getStatusColor(sale.status)}>
+                        {sale.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full mt-4">
+                <Eye className="h-4 w-4 mr-2" />
+                View All Sales
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>
+              Common tasks for sales activities
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button variant="outline" className="h-20 flex-col">
+                <Users className="h-6 w-6 mb-2" />
+                <span className="text-sm">Add Customer</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <ShoppingCart className="h-6 w-6 mb-2" />
+                <span className="text-sm">New Sale</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <Package className="h-6 w-6 mb-2" />
+                <span className="text-sm">View Products</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col">
+                <Award className="h-6 w-6 mb-2" />
+                <span className="text-sm">Performance</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 } 
