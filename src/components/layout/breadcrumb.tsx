@@ -44,9 +44,15 @@ export function Breadcrumb({ className, showHome = true }: BreadcrumbProps) {
       // Don't make the last item a link
       const isLast = index === segments.length - 1;
       
+      // Special handling for Admin breadcrumb
+      let href = isLast ? undefined : currentPath;
+      if (segment === 'admin' && !isLast) {
+        href = '/admin/dashboard';
+      }
+      
       breadcrumbs.push({
         label,
-        href: isLast ? undefined : currentPath,
+        href,
       });
     });
     

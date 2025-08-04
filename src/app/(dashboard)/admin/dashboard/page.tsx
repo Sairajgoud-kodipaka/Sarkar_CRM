@@ -151,7 +151,7 @@ export default function AdminDashboard() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           {/* Customers Stats */}
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/admin/customers'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Products Stats */}
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/admin/products'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Products</CardTitle>
               <ShoppingBag className="h-4 w-4 text-muted-foreground" />
@@ -179,7 +179,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Sales Stats */}
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/admin/sales'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -193,7 +193,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Revenue Stats */}
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/admin/sales-and-analytics'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />

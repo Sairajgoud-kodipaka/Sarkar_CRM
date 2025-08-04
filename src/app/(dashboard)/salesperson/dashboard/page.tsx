@@ -32,9 +32,9 @@ export default function SalespersonDashboard() {
   const { data: productsResponse, loading: productsLoading, error: productsError } = useProducts({ limit: 10 });
   const { data: salesResponse, loading: salesLoading, error: salesError } = useSales({ limit: 10 });
 
-  const customers = customersResponse?.data || [];
-  const products = productsResponse?.data || [];
-  const sales = salesResponse?.data || [];
+  const customers = customersResponse || [];
+  const products = productsResponse || [];
+  const sales = salesResponse || [];
 
   const loading = customersLoading || productsLoading || salesLoading;
   const error = customersError || productsError || salesError;
@@ -89,19 +89,17 @@ export default function SalespersonDashboard() {
           title={`${currentUser} Dashboard`}
           description="Track your sales performance and manage customers"
           breadcrumbs={true}
-          actions={[
-            {
-              label: 'New Sale',
-              icon: Plus,
-              onClick: () => window.location.href = '/salesperson/sales/new',
-              variant: 'default'
-            }
-          ]}
+          actions={
+            <Button onClick={() => window.location.href = '/salesperson/sales/new'}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Sale
+            </Button>
+          }
         />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/salesperson/customers'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">My Customers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -114,7 +112,7 @@ export default function SalespersonDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/salesperson/products'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Available Products</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
@@ -129,7 +127,7 @@ export default function SalespersonDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/salesperson/sales'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -144,7 +142,7 @@ export default function SalespersonDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Performance</CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />

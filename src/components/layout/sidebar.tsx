@@ -49,9 +49,23 @@ export function Sidebar({ isOpen, onToggle, userRole = 'BUSINESS_ADMIN', userFlo
 
   // Generate navigation URLs based on user role
   const getNavigationUrls = () => {
-    const basePath = userRole === 'FLOOR_MANAGER' ? '/floor-manager' : '/admin';
+    let basePath = '/admin';
+    let navigationItems = baseNavigation;
     
-    return baseNavigation.map(item => ({
+    if (userRole === 'FLOOR_MANAGER') {
+      basePath = '/floor-manager';
+    } else if (userRole === 'SALESPERSON') {
+      basePath = '/salesperson';
+      // Salesperson has limited navigation
+      navigationItems = [
+        { name: 'Dashboard', icon: LayoutDashboard },
+        { name: 'Customers', icon: Users },
+        { name: 'Sales', icon: DollarSign },
+        { name: 'Products', icon: Package },
+      ];
+    }
+    
+    return navigationItems.map(item => ({
       ...item,
       href: `${basePath}/${item.name.toLowerCase().replace(/\s+/g, '-').replace('&', 'and')}`
     }));

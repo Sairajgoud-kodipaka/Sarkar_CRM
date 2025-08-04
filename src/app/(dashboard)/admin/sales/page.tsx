@@ -235,7 +235,7 @@ export default function AdminSales() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                                     <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="COMPLETED">Completed</SelectItem>
                   <SelectItem value="PENDING">Pending</SelectItem>
                   <SelectItem value="CANCELLED">Cancelled</SelectItem>
