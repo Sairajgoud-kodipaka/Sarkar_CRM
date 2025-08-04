@@ -43,7 +43,7 @@ export default function AdminTeam() {
     refetch 
   } = useUsers({ search: searchQuery, role: roleFilter, status: statusFilter, limit: 50 });
 
-  const users = usersResponse?.data || [];
+  const users = usersResponse || [];
 
   const getRoleColor = (role: string) => {
     switch (role) {

@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         status: 'PENDING'
       },
       include: {
-        requester: {
+        users_approval_workflows_requester_idTousers: {
           select: {
             id: true,
             name: true,
