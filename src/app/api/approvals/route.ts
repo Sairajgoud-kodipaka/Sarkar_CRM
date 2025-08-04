@@ -28,25 +28,7 @@ export async function GET(request: NextRequest) {
         created_at: 'desc'
       },
       skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        users_approval_workflows_requester_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
-        },
-        users_approval_workflows_approver_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
-        }
-      }
+      take: limit
     });
 
     // Get total count
@@ -111,16 +93,6 @@ export async function POST(request: NextRequest) {
         approval_notes: approvalNotes,
         priority,
         status: 'PENDING'
-      },
-      include: {
-        users_approval_workflows_requester_idTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true
-          }
-        }
       }
     });
 

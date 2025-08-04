@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/products/[id] - Get product by ID
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     const product = await prisma.products.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!product) {
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT /api/products/[id] - Update product
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     const body = await request.json();
     const {
@@ -49,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Check if product exists
     const existingProduct = await prisma.products.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingProduct) {
@@ -61,7 +63,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Update product
     const product = await prisma.products.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name: name || existingProduct.name,
         description: description || existingProduct.description,
@@ -94,11 +96,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/products/[id] - Delete product
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     // Check if product exists
     const existingProduct = await prisma.products.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingProduct) {
@@ -110,7 +113,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     // Delete product
     await prisma.products.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     return NextResponse.json({

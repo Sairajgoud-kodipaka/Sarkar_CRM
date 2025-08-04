@@ -3,11 +3,12 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const customer = await prisma.customers.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!customer) {
@@ -57,8 +58,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
 
@@ -72,7 +74,7 @@ export async function PUT(
 
     // Check if customer exists
     const existingCustomer = await prisma.customers.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingCustomer) {
@@ -84,7 +86,7 @@ export async function PUT(
 
     // Update customer
     const updatedCustomer = await prisma.customers.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         name: body.name,
         email: body.email,
@@ -98,37 +100,17 @@ export async function PUT(
         occupation: body.occupation,
         income_range: body.incomeRange,
         social_circle: body.socialCircle,
-        occasions: body.occasions,
-        budget_range: body.budgetRange,
-        notes: body.notes,
         status: body.status,
         floor_id: body.floorId,
-        assigned_to_id: body.assignedToId
+        assigned_to_id: body.assignedToId,
+        notes: body.notes,
+        updated_at: new Date()
       }
     });
 
-    // Fetch related data for updated customer
-    const [floor, assignedTo] = await Promise.all([
-      updatedCustomer.floor_id ? prisma.floors.findUnique({
-        where: { id: updatedCustomer.floor_id },
-        select: { id: true, name: true }
-      }) : null,
-      updatedCustomer.assigned_to_id ? prisma.users.findUnique({
-        where: { id: updatedCustomer.assigned_to_id },
-        select: { id: true, name: true }
-      }) : null
-    ]);
-
-    const updatedCustomerWithRelations = {
-      ...updatedCustomer,
-      floor,
-      assignedTo
-    };
-
     return NextResponse.json({
       success: true,
-      message: 'Customer updated successfully',
-      data: updatedCustomerWithRelations
+      data: updatedCustomer
     });
   } catch (error: any) {
     console.error('Error updating customer:', error);
@@ -141,12 +123,13 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     // Check if customer exists
     const existingCustomer = await prisma.customers.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingCustomer) {
@@ -158,7 +141,7 @@ export async function DELETE(
 
     // Delete customer
     await prisma.customers.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     return NextResponse.json({

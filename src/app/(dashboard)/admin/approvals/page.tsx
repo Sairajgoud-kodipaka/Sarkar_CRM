@@ -181,7 +181,7 @@ export default function AdminApprovals() {
       // Update local state
       setApprovals(prev => prev.map(approval => 
         approval.id === approvalId 
-          ? { ...approval, status: 'APPROVED', approvalNotes, approvedAt: new Date().toISOString() }
+          ? { ...approval, status: 'APPROVED', approvalNotes: approvalNotes || null, approvedAt: new Date().toISOString() }
           : approval
       ));
       setIsReviewDialogOpen(false);
@@ -198,7 +198,7 @@ export default function AdminApprovals() {
       // Update local state
       setApprovals(prev => prev.map(approval => 
         approval.id === approvalId 
-          ? { ...approval, status: 'REJECTED', approvalNotes }
+          ? { ...approval, status: 'REJECTED', approvalNotes: approvalNotes || null }
           : approval
       ));
       setIsReviewDialogOpen(false);
@@ -215,7 +215,7 @@ export default function AdminApprovals() {
       // Update local state
       setApprovals(prev => prev.map(approval => 
         approval.id === approvalId 
-          ? { ...approval, status: 'ESCALATED', approvalNotes }
+          ? { ...approval, status: 'ESCALATED', approvalNotes: approvalNotes || null }
           : approval
       ));
       setIsReviewDialogOpen(false);
