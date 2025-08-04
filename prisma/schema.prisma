@@ -7,7 +7,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model approval_workflows {
+  id                                           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actionType                                   String             @db.VarChar(50)
+  requester_id                                 String             @db.Uuid
+  approver_id                                  String?            @db.Uuid
+  status                                       approval_status?   @default(PENDING)
+  requestData                                  Json
+  approval_notes                               String?
+  priority                                     approval_priority? @default(MEDIUM)
+  created_at                                   DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at                                   DateTime?          @default(now()) @db.Timestamptz(6)
+  approved_at                                  DateTime?          @db.Timestamptz(6)
+  users_approval_workflows_approver_idTousers  users?             @relation("approval_workflows_approver_idTousers", fields: [approver_id], references: [id])
+  users_approval_workflows_requester_idTousers users              @relation("approval_workflows_requester_idTousers", fields: [requester_id], references: [id], onDelete: Cascade)
+
+  @@index([actionType], map: "idx_approval_workflows_action_type")
+  @@index([approver_id], map: "idx_approval_workflows_approver_id")
+  @@index([requester_id], map: "idx_approval_workflows_requester_id")
+  @@index([status], map: "idx_approval_workflows_status")
+}
+
+model audit_logs {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String    @db.Uuid
+  action      String    @db.VarChar(100)
+  entity_type String    @db.VarChar(50)
+  entity_id   String    @db.Uuid
+  oldData     Json?
+  newData     Json?
+  ip_address  String?   @db.VarChar(45)
+  user_agent  String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at], map: "idx_audit_logs_created_at")
+  @@index([entity_type, entity_id], map: "idx_audit_logs_entity")
+  @@index([user_id], map: "idx_audit_logs_user_id")
+}
+
 model categories {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String    @db.VarChar(100)
@@ -18,11 +56,14 @@ model categories {
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
   updated_at  DateTime? @default(now()) @db.Timestamptz(6)
 
+  // Relations
+  products    products[]
+  store       stores     @relation(fields: [store_id], references: [id])
+
   @@index([parent_id], map: "idx_categories_parent_id")
   @@index([store_id], map: "idx_categories_store_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model customer_product_preferences {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   preference  String    @db.VarChar(50)
@@ -37,7 +78,6 @@ model customer_product_preferences {
   @@index([product_id], map: "idx_customer_product_preferences_product_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model customers {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String           @db.VarChar(255)
@@ -62,13 +102,38 @@ model customers {
   created_at     DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
 
+  // Relations
+  sales          sales[]
+  store          stores    @relation(fields: [store_id], references: [id])
+  floor          floors?   @relation(fields: [floor_id], references: [id])
+  assigned_to    users?    @relation("customers_assigned_to", fields: [assigned_to_id], references: [id])
+
   @@index([assigned_to_id], map: "idx_customers_assigned_to_id")
   @@index([email], map: "idx_customers_email")
   @@index([phone], map: "idx_customers_phone")
   @@index([store_id], map: "idx_customers_store_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model escalations {
+  id                                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                                 String               @db.VarChar(255)
+  description                           String
+  priority                              escalation_priority? @default(MEDIUM)
+  status                                escalation_status?   @default(OPEN)
+  requester_id                          String               @db.Uuid
+  assignee_id                           String?              @db.Uuid
+  created_at                            DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime?            @default(now()) @db.Timestamptz(6)
+  resolved_at                           DateTime?            @db.Timestamptz(6)
+  users_escalations_assignee_idTousers  users?               @relation("escalations_assignee_idTousers", fields: [assignee_id], references: [id])
+  users_escalations_requester_idTousers users                @relation("escalations_requester_idTousers", fields: [requester_id], references: [id], onDelete: Cascade)
+
+  @@index([assignee_id], map: "idx_escalations_assignee_id")
+  @@index([priority], map: "idx_escalations_priority")
+  @@index([requester_id], map: "idx_escalations_requester_id")
+  @@index([status], map: "idx_escalations_status")
+}
+
 model floors {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String    @db.VarChar(100)
@@ -78,12 +143,17 @@ model floors {
   store_id    String    @db.Uuid
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
   updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  
+  // Relations
+  support_tickets support_tickets[]
+  customers       customers[]
+  sales           sales[]
+  store           stores     @relation(fields: [store_id], references: [id])
 
   @@unique([store_id, number])
   @@index([store_id], map: "idx_floors_store_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model follow_ups {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   scheduled_date DateTime          @db.Timestamptz(6)
@@ -100,7 +170,6 @@ model follow_ups {
   @@index([scheduled_date], map: "idx_follow_ups_scheduled_date")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model interactions {
   id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type        interaction_type
@@ -116,7 +185,6 @@ model interactions {
   @@index([user_id], map: "idx_interactions_user_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model products {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String    @db.VarChar(255)
@@ -136,12 +204,16 @@ model products {
   created_at     DateTime? @default(now()) @db.Timestamptz(6)
   updated_at     DateTime? @default(now()) @db.Timestamptz(6)
 
+  // Relations
+  sales          sales[]
+  store          stores    @relation(fields: [store_id], references: [id])
+  category       categories @relation(fields: [category_id], references: [id])
+
   @@index([category_id], map: "idx_products_category_id")
   @@index([sku], map: "idx_products_sku")
   @@index([store_id], map: "idx_products_store_id")
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model sales {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   amount         Decimal      @db.Decimal(10, 2)
@@ -159,6 +231,13 @@ model sales {
   created_at     DateTime?    @default(now()) @db.Timestamptz(6)
   updated_at     DateTime?    @default(now()) @db.Timestamptz(6)
 
+  // Relations
+  customer       customers    @relation(fields: [customer_id], references: [id])
+  product        products     @relation(fields: [product_id], references: [id])
+  store          stores       @relation(fields: [store_id], references: [id])
+  floor          floors       @relation(fields: [floor_id], references: [id])
+  user           users        @relation(fields: [user_id], references: [id])
+
   @@index([created_at], map: "idx_sales_created_at")
   @@index([customer_id], map: "idx_sales_customer_id")
   @@index([store_id], map: "idx_sales_store_id")
@@ -172,7 +251,6 @@ model sessions {
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model stores {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String    @db.VarChar(255)
@@ -188,22 +266,42 @@ model stores {
   is_active   Boolean?  @default(true)
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
   updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  
+  // Relations
+  users       users[]
+  customers   customers[]
+  products    products[]
+  sales       sales[]
+  categories  categories[]
+  floors      floors[]
+  support_tickets support_tickets[]
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users {
-  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String?    @db.VarChar(255)
-  email          String     @unique @db.VarChar(255)
-  email_verified DateTime?  @db.Timestamptz(6)
-  image          String?
-  password       String?    @db.VarChar(255)
-  role           user_role? @default(FLOOR_MANAGER)
-  is_active      Boolean?   @default(true)
-  store_id       String?    @db.Uuid
-  floor_id       String?    @db.Uuid
-  created_at     DateTime?  @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime?  @default(now()) @db.Timestamptz(6)
+  id                                                        String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                                      String?              @db.VarChar(255)
+  email                                                     String               @unique @db.VarChar(255)
+  email_verified                                            DateTime?            @db.Timestamptz(6)
+  image                                                     String?
+  password                                                  String?              @db.VarChar(255)
+  role                                                      user_role?           @default(FLOOR_MANAGER)
+  is_active                                                 Boolean?             @default(true)
+  store_id                                                  String?              @db.Uuid
+  floor_id                                                  String?              @db.Uuid
+  created_at                                                DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at                                                DateTime?            @default(now()) @db.Timestamptz(6)
+  approval_workflows_approval_workflows_approver_idTousers  approval_workflows[] @relation("approval_workflows_approver_idTousers")
+  approval_workflows_approval_workflows_requester_idTousers approval_workflows[] @relation("approval_workflows_requester_idTousers")
+  audit_logs                                                audit_logs[]
+  escalations_escalations_assignee_idTousers                escalations[]        @relation("escalations_assignee_idTousers")
+  escalations_escalations_requester_idTousers               escalations[]        @relation("escalations_requester_idTousers")
+  support_tickets_assigned_to                               support_tickets[]    @relation("support_tickets_assigned_to")
+  support_tickets_created_by                                support_tickets[]    @relation("support_tickets_created_by")
+  
+  // Relations
+  store       stores?    @relation(fields: [store_id], references: [id])
+  sales       sales[]
+  customers_assigned_to customers[] @relation("customers_assigned_to")
 
   @@index([email], map: "idx_users_email")
   @@index([store_id], map: "idx_users_store_id")
@@ -218,15 +316,38 @@ model verification_tokens {
   @@unique([identifier, token])
 }
 
-enum UserRole {
-  BUSINESS_ADMIN
-  FLOOR_MANAGER
-}
+model support_tickets {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String           @db.VarChar(255)
+  description     String
+  priority        support_priority @default(MEDIUM)
+  status          support_status   @default(OPEN)
+  category        support_category @default(GENERAL)
+  customer_name   String           @db.VarChar(255)
+  customer_email  String?          @db.VarChar(255)
+  customer_phone  String?          @db.VarChar(20)
+  assigned_to_id  String?          @db.Uuid
+  store_id        String           @db.Uuid
+  floor_id        String?          @db.Uuid
+  created_by_id   String           @db.Uuid
+  resolved_at     DateTime?        @db.Timestamptz(6)
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?        @default(now()) @db.Timestamptz(6)
 
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
+  // Relations
+  assigned_to     users?           @relation("support_tickets_assigned_to", fields: [assigned_to_id], references: [id])
+  created_by      users            @relation("support_tickets_created_by", fields: [created_by_id], references: [id])
+  store           stores           @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  floor           floors?          @relation(fields: [floor_id], references: [id])
+
+  @@index([status], map: "idx_support_tickets_status")
+  @@index([priority], map: "idx_support_tickets_priority")
+  @@index([category], map: "idx_support_tickets_category")
+  @@index([store_id], map: "idx_support_tickets_store_id")
+  @@index([floor_id], map: "idx_support_tickets_floor_id")
+  @@index([assigned_to_id], map: "idx_support_tickets_assigned_to_id")
+  @@index([created_by_id], map: "idx_support_tickets_created_by_id")
+  @@index([created_at], map: "idx_support_tickets_created_at")
 }
 
 enum CustomerStatus {
@@ -234,6 +355,27 @@ enum CustomerStatus {
   INACTIVE
   PROSPECT
   CONVERTED
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum FollowUpType {
+  PHONE_CALL
+  EMAIL
+  SMS
+  VISIT
+  DEMO
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
 }
 
 enum InteractionType {
@@ -246,32 +388,52 @@ enum InteractionType {
   INQUIRY
 }
 
-enum FollowUpType {
-  PHONE_CALL
-  EMAIL
-  SMS
-  VISIT
-  DEMO
-}
-
-enum FollowUpStatus {
-  PENDING
-  COMPLETED
-  CANCELLED
-  RESCHEDULED
-}
-
 enum SaleStatus {
   PENDING
   COMPLETED
   CANCELLED
   REFUNDED
 }
+
+enum UserRole {
+  BUSINESS_ADMIN
+  FLOOR_MANAGER
+}
+
+enum approval_priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum approval_status {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
 enum customer_status {
   ACTIVE
   INACTIVE
   PROSPECT
   CONVERTED
+}
+
+enum escalation_priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum escalation_status {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
 
 enum follow_up_status {
@@ -315,5 +477,29 @@ enum sale_status {
 enum user_role {
   BUSINESS_ADMIN
   FLOOR_MANAGER
+  SALESPERSON
 }
 
+enum support_priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum support_status {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum support_category {
+  TECHNICAL
+  PRODUCT
+  SALES
+  BILLING
+  GENERAL
+  COMPLAINT
+  FEATURE_REQUEST
+}

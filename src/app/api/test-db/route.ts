@@ -1,49 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    // Test database connection by trying to get stores count
-    const storesCount = await prisma.store.count();
+    // Test database connection
+    await prisma.$connect();
     
-    // Test getting a few stores
-    const stores = await prisma.store.findMany({
-      take: 3,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true
-      }
-    });
-
-    // Test getting users count
-    const usersCount = await prisma.user.count();
-
-    // Test getting customers count
-    const customersCount = await prisma.customer.count();
-
+    // Try to get a simple count
+    const customerCount = await prisma.customers.count();
+    const productCount = await prisma.products.count();
+    const userCount = await prisma.users.count();
+    
     return NextResponse.json({
       success: true,
       message: 'Database connection successful',
       data: {
-        storesCount,
-        usersCount,
-        customersCount,
-        sampleStores: stores,
-        timestamp: new Date().toISOString()
+        customerCount,
+        productCount,
+        userCount,
+        databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Not set',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set'
       }
     });
-
   } catch (error: any) {
     console.error('Database test error:', error);
     return NextResponse.json(
       { 
-        success: false,
+        success: false, 
         error: error.message || 'Database connection failed',
-        details: error.stack
+        details: {
+          databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Not set',
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set'
+        }
       },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 } 

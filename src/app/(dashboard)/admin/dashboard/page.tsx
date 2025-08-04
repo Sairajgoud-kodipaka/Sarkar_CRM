@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout';
+import { MobileQuickActions } from '@/components/layout/mobile-nav';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -36,7 +38,8 @@ import {
   ArrowDownRight,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Package
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +47,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { useAnalytics, useCustomers, useSales, useProducts } from '@/hooks/useRealData';
+import { toast } from '@/hooks/use-toast';
 import { 
   LineChart, 
   Line, 
@@ -62,157 +69,96 @@ import {
   Legend
 } from 'recharts';
 
-// Enhanced mock data for business admin dashboard
-const visitorMetrics = {
-  today: 156,
-  thisWeek: 892,
-  thisMonth: 3247,
-  change: 12.5
-};
-
-const salesMetrics = {
-  today: 45000,
-  thisWeek: 285000,
-  thisMonth: 1250000,
-  change: 8.3
-};
-
-const floorCustomers = {
-  floor1: [
-    { name: 'Priya Sharma', number: '+91 98765 43210', interest: 'Gold Necklace', status: 'hot' },
-    { name: 'Amit Patel', number: '+91 87654 32109', interest: 'Diamond Ring', status: 'warm' },
-    { name: 'Kavya Singh', number: '+91 76543 21098', interest: 'Silver Bracelet', status: 'cold' },
-    { name: 'Rahul Verma', number: '+91 65432 10987', interest: 'Platinum Chain', status: 'hot' }
-  ],
-  floor2: [
-    { name: 'Neha Gupta', number: '+91 54321 09876', interest: 'Pearl Set', status: 'warm' },
-    { name: 'Vikram Malhotra', number: '+91 43210 98765', interest: 'Ruby Earrings', status: 'hot' },
-    { name: 'Sneha Reddy', number: '+91 32109 87654', interest: 'Emerald Ring', status: 'cold' },
-    { name: 'Rajesh Kumar', number: '+91 21098 76543', interest: 'Sapphire Necklace', status: 'warm' }
-  ],
-  floor3: [
-    { name: 'Anjali Desai', number: '+91 10987 65432', interest: 'Gold Bangle', status: 'hot' },
-    { name: 'Mohan Singh', number: '+91 09876 54321', interest: 'Diamond Pendant', status: 'warm' },
-    { name: 'Pooja Sharma', number: '+91 98765 43210', interest: 'Silver Ring', status: 'cold' },
-    { name: 'Arjun Mehta', number: '+91 87654 32109', interest: 'Platinum Earrings', status: 'hot' }
-  ]
-};
-
-// New data for enhanced features
-const recentActivities = [
-  {
-    id: 1,
-    type: 'sale',
-    message: 'Sale completed: Gold Necklace - ₹45,000',
-    time: '2 minutes ago',
-    user: 'Priya Patel',
-    floor: 'Floor 1'
-  },
-  {
-    id: 2,
-    type: 'customer',
-    message: 'New customer registered: Rahul Sharma',
-    time: '15 minutes ago',
-    user: 'Amit Kumar',
-    floor: 'Floor 2'
-  },
-  {
-    id: 3,
-    type: 'followup',
-    message: 'Follow-up scheduled: Neha Gupta',
-    time: '1 hour ago',
-    user: 'Priya Patel',
-    floor: 'Floor 1'
-  },
-  {
-    id: 4,
-    type: 'inventory',
-    message: 'Low stock alert: Diamond Rings',
-    time: '2 hours ago',
-    user: 'System',
-    floor: 'All Floors'
-  }
-];
-
-const topPerformers = [
-  {
-    name: 'Priya Patel',
-    sales: 1250000,
-    customers: 45,
-    conversion: 78,
-    avatar: 'PP'
-  },
-  {
-    name: 'Amit Kumar',
-    sales: 980000,
-    customers: 38,
-    conversion: 72,
-    avatar: 'AK'
-  },
-  {
-    name: 'Rajesh Verma',
-    sales: 850000,
-    customers: 32,
-    conversion: 68,
-    avatar: 'RV'
-  }
-];
-
-const inventoryAlerts = [
-  {
-    product: 'Gold Necklace 22K',
-    current: 5,
-    threshold: 10,
-    status: 'critical'
-  },
-  {
-    product: 'Diamond Ring 1ct',
-    current: 8,
-    threshold: 15,
-    status: 'warning'
-  },
-  {
-    product: 'Silver Bracelet',
-    current: 12,
-    threshold: 20,
-    status: 'normal'
-  }
-];
-
-const salesData = [
-  { month: 'Jan', sales: 850000, visitors: 1200 },
-  { month: 'Feb', sales: 920000, visitors: 1350 },
-  { month: 'Mar', sales: 780000, visitors: 1100 },
-  { month: 'Apr', sales: 1050000, visitors: 1500 },
-  { month: 'May', sales: 1250000, visitors: 1800 },
-  { month: 'Jun', sales: 1150000, visitors: 1700 }
-];
-
 export default function AdminDashboard() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('day');
+  const router = useRouter();
+  
+  // Real data hooks with enhanced error handling
+  const { 
+    data: analyticsData, 
+    loading: analyticsLoading, 
+    error: analyticsError,
+    retry: retryAnalytics
+  } = useAnalytics('dashboard');
+  
+  const { 
+    data: customers, 
+    loading: customersLoading, 
+    error: customersError,
+    retry: retryCustomers
+  } = useCustomers({ limit: 10 });
+  
+  const { 
+    data: sales, 
+    loading: salesLoading, 
+    error: salesError,
+    retry: retrySales
+  } = useSales({ limit: 10 });
+  
+  const { 
+    data: products, 
+    loading: productsLoading, 
+    error: productsError,
+    retry: retryProducts
+  } = useProducts({ limit: 10 });
+
+  // Loading and error states
+  const isLoading = analyticsLoading || customersLoading || salesLoading || productsLoading;
+  const hasError = analyticsError || customersError || salesError || productsError;
+
+  // Retry all data
+  const retryAll = () => {
+    retryAnalytics();
+    retryCustomers();
+    retrySales();
+    retryProducts();
+  };
+
+  // Process real data
+  const visitorMetrics = analyticsData?.visitorMetrics || {
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    change: 0
+  };
+
+  const salesMetrics = analyticsData?.salesMetrics || {
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    change: 0
+  };
+
+  const floorCustomers = analyticsData?.floorCustomers || {
+    floor1: [],
+    floor2: [],
+    floor3: []
+  };
+
+  const salesChartData = analyticsData?.salesChart || [];
+  const categoryData = analyticsData?.categoryData || [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case 'sale': return <DollarSign className="h-4 w-4 text-green-600" />;
-      case 'customer': return <Users className="h-4 w-4 text-blue-600" />;
-      case 'followup': return <Calendar className="h-4 w-4 text-orange-600" />;
-      case 'inventory': return <AlertTriangle className="h-4 w-4 text-red-600" />;
-      default: return <Activity className="h-4 w-4 text-gray-600" />;
+      case 'sale': return <ShoppingBag className="h-4 w-4 text-green-500" />;
+      case 'customer': return <Users className="h-4 w-4 text-blue-500" />;
+      case 'product': return <Package className="h-4 w-4 text-purple-500" />;
+      default: return <Activity className="h-4 w-4 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'hot': return 'bg-red-100 text-red-800';
-      case 'warm': return 'bg-orange-100 text-orange-800';
+      case 'warm': return 'bg-yellow-100 text-yellow-800';
       case 'cold': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -220,309 +166,343 @@ export default function AdminDashboard() {
 
   const getAlertColor = (status: string) => {
     switch (status) {
-      case 'critical': return 'text-red-600';
-      case 'warning': return 'text-orange-600';
-      case 'normal': return 'text-green-600';
+      case 'low': return 'text-red-600';
+      case 'medium': return 'text-yellow-600';
+      case 'high': return 'text-green-600';
       default: return 'text-gray-600';
     }
   };
 
+  // Navigation handlers
+  const handleCreateCustomer = () => {
+    toast({
+      title: "Navigating...",
+      description: "Opening customer creation form",
+    });
+    router.push('/admin/customers/new');
+  };
+
+  const handleViewAllSales = () => {
+    toast({
+      title: "Navigating...",
+      description: "Opening sales dashboard",
+    });
+    router.push('/admin/sales');
+  };
+
+  const handleManageProducts = () => {
+    toast({
+      title: "Navigating...",
+      description: "Opening products management",
+    });
+    router.push('/admin/products');
+  };
+
+  const handleAddProduct = () => {
+    toast({
+      title: "Navigating...",
+      description: "Opening product creation form",
+    });
+    router.push('/admin/products/new');
+  };
+
+  const handleExportReport = () => {
+    toast({
+      title: "Export Feature",
+      description: "Export functionality coming soon!",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <LoadingSpinner text="Loading dashboard data..." />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <ErrorMessage error={hasError} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Mobile quick actions
+  const mobileActions = [
+    {
+      label: 'Add Customer',
+      icon: Users,
+      onClick: handleCreateCustomer,
+      color: 'bg-blue-500 text-white hover:bg-blue-600'
+    },
+    {
+      label: 'View Sales',
+      icon: DollarSign,
+      onClick: handleViewAllSales,
+      color: 'bg-green-500 text-white hover:bg-green-600'
+    },
+    {
+      label: 'Manage Products',
+      icon: Package,
+      onClick: handleManageProducts,
+      color: 'bg-purple-500 text-white hover:bg-purple-600'
+    },
+    {
+      label: 'Add Product',
+      icon: Plus,
+      onClick: handleAddProduct,
+      color: 'bg-orange-500 text-white hover:bg-orange-600'
+    }
+  ];
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">Welcome back! Here's what's happening with your store today.</p>
+            <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" size="sm" onClick={handleExportReport}>
+              <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
-            
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button size="sm" onClick={handleCreateCustomer}>
+              <Plus className="h-4 w-4 mr-2" />
               Add Customer
             </Button>
           </div>
         </div>
 
-        {/* Enhanced KPI Cards */}
+        {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Link href="/admin/visitors">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Visitors</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{visitorMetrics.thisMonth.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground flex items-center">
-                    <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-                    +{visitorMetrics.change}% from last month
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </motion.div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Visitors</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{visitorMetrics.today}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className={visitorMetrics.change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {visitorMetrics.change >= 0 ? '+' : ''}{visitorMetrics.change}%
+                </span> from yesterday
+              </p>
+            </CardContent>
+          </Card>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Link href="/admin/sales">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(salesMetrics.thisMonth)}</div>
-                  <p className="text-xs text-muted-foreground flex items-center">
-                    <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-                    +{salesMetrics.change}% from last month
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </motion.div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(salesMetrics.today)}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className={salesMetrics.change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {salesMetrics.change >= 0 ? '+' : ''}{salesMetrics.change}%
+                </span> from yesterday
+              </p>
+            </CardContent>
+          </Card>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Link href="/admin/customers">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">1,247</div>
-                  <p className="text-xs text-muted-foreground flex items-center">
-                    <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-                    +15% from last month
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </motion.div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{customers?.length || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Active customers this month
+              </p>
+            </CardContent>
+          </Card>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">23.4%</div>
-                <p className="text-xs text-muted-foreground flex items-center">
-                  <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-                  +2.1% from last month
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{products?.length || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Available products
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Sales Chart and Recent Activities */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sales Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="lg:col-span-2"
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Sales Performance</CardTitle>
-                <CardDescription>Monthly sales and visitor trends</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={salesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="sales" stroke="#8884d8" strokeWidth={2} />
-                    <Line type="monotone" dataKey="visitors" stroke="#82ca9d" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </motion.div>
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common tasks and navigation</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-20 flex flex-col items-center justify-center space-y-2"
+                onClick={handleCreateCustomer}
+              >
+                <Users className="h-6 w-6" />
+                <span>Create Customer</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="h-20 flex flex-col items-center justify-center space-y-2"
+                onClick={handleViewAllSales}
+              >
+                <DollarSign className="h-6 w-6" />
+                <span>View All Sales</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="h-20 flex flex-col items-center justify-center space-y-2"
+                onClick={handleManageProducts}
+              >
+                <Package className="h-6 w-6" />
+                <span>Manage Products</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="h-20 flex flex-col items-center justify-center space-y-2"
+                onClick={handleAddProduct}
+              >
+                <Plus className="h-6 w-6" />
+                <span>Add Product</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Recent Activities */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activities</CardTitle>
-                <CardDescription>Latest store activities</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 mt-1">
-                        {getActivityIcon(activity.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{activity.message}</p>
-                        <p className="text-xs text-gray-500">{activity.time} • {activity.user}</p>
-                        <p className="text-xs text-gray-400">{activity.floor}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Top Performers and Inventory Alerts */}
+        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Performers */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Performers</CardTitle>
-                <CardDescription>Best performing sales staff</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {topPerformers.map((performer, index) => (
-                    <div key={performer.name} className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-medium">
-                          {performer.avatar}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{performer.name}</p>
-                        <p className="text-xs text-gray-500">{formatCurrency(performer.sales)} • {performer.customers} customers</p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <Badge variant="secondary">{performer.conversion}%</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Sales Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales Trend</CardTitle>
+              <CardDescription>Monthly sales performance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={salesChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-          {/* Inventory Alerts */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-          >
-            <Card>
+          {/* Category Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Category Distribution</CardTitle>
+              <CardDescription>Sales by product category</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {categoryData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Sales</CardTitle>
+            <CardDescription>Latest transactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {sales?.slice(0, 5).map((sale: any) => (
+                <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 bg-green-100 rounded-full">
+                      <ShoppingBag className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{sale.customerName || 'Customer'}</p>
+                      <p className="text-sm text-gray-600">{sale.productName || 'Product'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{formatCurrency(sale.amount || 0)}</p>
+                    <Badge variant={sale.status === 'COMPLETED' ? 'default' : 'secondary'}>
+                      {sale.status || 'PENDING'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Floor-wise Customer Distribution */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {Object.entries(floorCustomers).map(([floor, customers]: [string, any]) => (
+            <Card key={floor}>
               <CardHeader>
-                <CardTitle>Inventory Alerts</CardTitle>
-                <CardDescription>Low stock notifications</CardDescription>
+                <CardTitle className="flex items-center">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  {floor.charAt(0).toUpperCase() + floor.slice(1)}
+                </CardTitle>
+                <CardDescription>{customers?.length || 0} customers</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {inventoryAlerts.map((alert, index) => (
+                <div className="space-y-3">
+                  {customers?.slice(0, 3).map((customer: any, index: number) => (
                     <div key={index} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{alert.product}</p>
-                        <p className="text-xs text-gray-500">Current: {alert.current} • Threshold: {alert.threshold}</p>
+                      <div>
+                        <p className="text-sm font-medium">{customer.name}</p>
+                        <p className="text-xs text-gray-600">{customer.phone}</p>
                       </div>
-                      <Badge 
-                        variant={alert.status === 'critical' ? 'destructive' : alert.status === 'warning' ? 'secondary' : 'default'}
-                        className={getAlertColor(alert.status)}
-                      >
-                        {alert.status}
+                      <Badge className={getStatusColor(customer.status)}>
+                        {customer.status}
                       </Badge>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        </div>
-
-        {/* Floor Customers Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {Object.entries(floorCustomers).map(([floor, customers], index) => (
-            <motion.div
-              key={floor}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 + index * 0.1 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold">{floor.replace('floor', 'Floor ')} customers</CardTitle>
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                      <SelectTrigger className="w-24 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Day</SelectItem>
-                        <SelectItem value="week">Week</SelectItem>
-                        <SelectItem value="month">Month</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="text-xs font-medium text-gray-500 flex justify-between">
-                      <span>Name</span>
-                      <span>Interest</span>
-                      <span>Status</span>
-                    </div>
-                    {customers.map((customer, customerIndex) => (
-                      <div key={customerIndex} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
-                        <div className="flex-1">
-                          <span className="font-medium">{customer.name}</span>
-                          <p className="text-xs text-gray-500">{customer.number}</p>
-                        </div>
-                        <span className="text-gray-500 text-xs">{customer.interest}</span>
-                        <Badge className={`text-xs ${getStatusColor(customer.status)}`}>
-                          {customer.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
           ))}
         </div>
       </div>
+      
+      {/* Mobile Quick Actions */}
+      <MobileQuickActions actions={mobileActions} />
     </DashboardLayout>
   );
 } 

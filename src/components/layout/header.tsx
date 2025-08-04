@@ -93,9 +93,15 @@ export function Header({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Add Customer</DropdownMenuItem>
-              <DropdownMenuItem>Add Product</DropdownMenuItem>
-              <DropdownMenuItem>Create Sale</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/admin/customers/new')}>
+                Add Customer
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/admin/products/new')}>
+                Add Product
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/admin/sales')}>
+                View Sales
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

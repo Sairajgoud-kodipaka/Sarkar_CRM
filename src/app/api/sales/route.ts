@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,56 +12,58 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || '';
     const floorId = searchParams.get('floorId') || '';
     const customerId = searchParams.get('customerId') || '';
-    const startDate = searchParams.get('startDate') || '';
-    const endDate = searchParams.get('endDate') || '';
+    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined;
+    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined;
 
     const skip = (page - 1) * limit;
 
     // Build where clause
     const where: any = {
-      storeId: 'store-001' // Default store for now
+      store_id: '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
     };
 
     if (status) where.status = status;
-    if (floorId) where.floorId = floorId;
-    if (customerId) where.customerId = customerId;
+    if (floorId) where.floor_id = floorId;
+    if (customerId) where.customer_id = customerId;
 
-    if (startDate && endDate) {
-      where.createdAt = {
-        gte: new Date(startDate),
-        lte: new Date(endDate)
-      };
+    if (startDate || endDate) {
+      where.created_at = {};
+      if (startDate) where.created_at.gte = startDate;
+      if (endDate) where.created_at.lte = endDate;
     }
 
-    // Get sales with related data
-    const sales = await prisma.sale.findMany({
+    // Get sales with pagination
+    const sales = await prisma.sales.findMany({
       where,
       orderBy: {
-        createdAt: 'desc'
+        created_at: 'desc'
       },
       skip,
       take: limit
     });
 
-    // Fetch related data separately
+    // Get total count
+    const total = await prisma.sales.count({ where });
+
+    // Fetch related data for each sale
     const salesWithRelations = await Promise.all(
       sales.map(async (sale) => {
         const [customer, product, floor, user] = await Promise.all([
-          prisma.customer.findUnique({
-            where: { id: sale.customerId },
-            select: { id: true, name: true, phone: true, email: true }
+          prisma.customers.findUnique({
+            where: { id: sale.customer_id },
+            select: { id: true, name: true, phone: true }
           }),
-          prisma.product.findUnique({
-            where: { id: sale.productId },
-            select: { id: true, name: true, sku: true, price: true }
+          prisma.products.findUnique({
+            where: { id: sale.product_id },
+            select: { id: true, name: true, sku: true }
           }),
-          prisma.floor.findUnique({
-            where: { id: sale.floorId },
-            select: { id: true, name: true, number: true }
+          prisma.floors.findUnique({
+            where: { id: sale.floor_id },
+            select: { id: true, name: true }
           }),
-          prisma.user.findUnique({
-            where: { id: sale.userId },
-            select: { id: true, name: true, email: true }
+          prisma.users.findUnique({
+            where: { id: sale.user_id },
+            select: { id: true, name: true }
           })
         ]);
 
@@ -73,16 +77,8 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Get total count
-    const total = await prisma.sale.count({ where });
-
     // Calculate total revenue
-    const totalRevenue = await prisma.sale.aggregate({
-      where,
-      _sum: {
-        totalAmount: true
-      }
-    });
+    const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
 
     return NextResponse.json({
       success: true,
@@ -93,7 +89,7 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit)
       },
-      totalRevenue: totalRevenue._sum.totalAmount || 0
+      totalRevenue
     });
   } catch (error: any) {
     console.error('Sales GET error:', error);
@@ -116,7 +112,7 @@ export async function POST(request: NextRequest) {
       discount = 0,
       paymentMethod = 'CASH',
       notes = '',
-      storeId = 'store-001' // Default store
+      storeId = '550e8400-e29b-41d4-a716-446655440000' // Use proper UUID
     } = body;
 
     // Validation
@@ -127,41 +123,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (amount <= 0) {
+    if (amount <= 0 || quantity <= 0 || discount < 0) {
       return NextResponse.json(
-        { success: false, error: 'Amount must be greater than 0' },
+        { success: false, error: 'Invalid amount, quantity, or discount values' },
         { status: 400 }
       );
     }
 
-    if (quantity <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Quantity must be greater than 0' },
-        { status: 400 }
-      );
-    }
-
-    if (discount < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Discount cannot be negative' },
-        { status: 400 }
-      );
-    }
-
-    // Calculate total amount
-    const totalAmount = (amount * quantity) - discount;
-
-    if (totalAmount < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Total amount cannot be negative after discount' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer exists
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId }
-    });
+    // Verify customer, product, and floor exist
+    const [customer, product, floor] = await Promise.all([
+      prisma.customers.findUnique({ where: { id: customerId } }),
+      prisma.products.findUnique({ where: { id: productId } }),
+      prisma.floors.findUnique({ where: { id: floorId } })
+    ]);
 
     if (!customer) {
       return NextResponse.json(
@@ -170,22 +144,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify product exists
-    const product = await prisma.product.findUnique({
-      where: { id: productId }
-    });
-
     if (!product) {
       return NextResponse.json(
         { success: false, error: 'Product not found' },
         { status: 404 }
       );
     }
-
-    // Verify floor exists
-    const floor = await prisma.floor.findUnique({
-      where: { id: floorId }
-    });
 
     if (!floor) {
       return NextResponse.json(
@@ -194,40 +158,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate total amount
+    const totalAmount = (parseFloat(amount) * parseInt(quantity)) - parseFloat(discount);
+    
     // Create the sale
-    const sale = await prisma.sale.create({
+    const sale = await prisma.sales.create({
       data: {
         amount: parseFloat(amount),
         quantity: parseInt(quantity),
         discount: parseFloat(discount),
-        totalAmount: totalAmount,
-        paymentMethod,
+        total_amount: totalAmount,
+        payment_method: paymentMethod,
         status: 'COMPLETED',
         notes,
-        storeId,
-        floorId,
-        customerId,
-        productId,
-        userId: 'user-001' // Default user for now - should come from auth context
+        store_id: storeId,
+        floor_id: floorId,
+        customer_id: customerId,
+        product_id: productId,
+        user_id: '550e8400-e29b-41d4-a716-446655440008' // Use proper UUID for user
       }
     });
 
     // Fetch related data for the created sale
     const [saleCustomer, saleProduct, saleFloor, saleUser] = await Promise.all([
-      prisma.customer.findUnique({
-        where: { id: sale.customerId },
+      prisma.customers.findUnique({
+        where: { id: sale.customer_id },
         select: { id: true, name: true, phone: true, email: true }
       }),
-      prisma.product.findUnique({
-        where: { id: sale.productId },
+      prisma.products.findUnique({
+        where: { id: sale.product_id },
         select: { id: true, name: true, sku: true, price: true }
       }),
-      prisma.floor.findUnique({
-        where: { id: sale.floorId },
+      prisma.floors.findUnique({
+        where: { id: sale.floor_id },
         select: { id: true, name: true, number: true }
       }),
-      prisma.user.findUnique({
-        where: { id: sale.userId },
+      prisma.users.findUnique({
+        where: { id: sale.user_id },
         select: { id: true, name: true, email: true }
       })
     ]);
@@ -241,14 +208,14 @@ export async function POST(request: NextRequest) {
     };
 
     // Create interaction record for this sale
-    await prisma.interaction.create({
+    await prisma.interactions.create({
       data: {
         type: 'SALE',
-        description: `Sale recorded: ${product.name} for ₹${totalAmount}`,
+        description: `Sale recorded: ${saleProduct?.name} for ₹${saleWithRelations.total_amount}`,
         outcome: 'COMPLETED',
-        nextAction: 'Follow up for future purchases',
-        customerId,
-        userId: 'user-001'
+        next_action: 'Follow up for future purchases',
+        customer_id: customerId,
+        user_id: '550e8400-e29b-41d4-a716-446655440008'
       }
     });
 

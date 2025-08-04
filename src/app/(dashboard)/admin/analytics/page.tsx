@@ -7,6 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorMessage } from '@/components/ui/error-message';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import {
   BarChart3,
   TrendingUp,
@@ -42,57 +45,12 @@ import {
   Legend
 } from 'recharts';
 
-// Mock data for analytics
-const salesData = [
-  { month: 'Jan', sales: 4000, customers: 2400, products: 1800 },
-  { month: 'Feb', sales: 3000, customers: 1398, products: 2210 },
-  { month: 'Mar', sales: 2000, customers: 9800, products: 2290 },
-  { month: 'Apr', sales: 2780, customers: 3908, products: 2000 },
-  { month: 'May', sales: 1890, customers: 4800, products: 2181 },
-  { month: 'Jun', sales: 2390, customers: 3800, products: 2500 },
-];
-
-const pieData = [
-  { name: 'Gold', value: 400, color: '#FFD700' },
-  { name: 'Diamond', value: 300, color: '#B9F2FF' },
-  { name: 'Silver', value: 300, color: '#C0C0C0' },
-  { name: 'Platinum', value: 200, color: '#E5E4E2' },
-];
-
-const metrics = [
-  {
-    title: 'Total Revenue',
-    value: '₹12,50,000',
-    change: '+12.5%',
-    changeType: 'positive',
-    icon: DollarSign,
-  },
-  {
-    title: 'Total Customers',
-    value: '1,234',
-    change: '+8.2%',
-    changeType: 'positive',
-    icon: Users,
-  },
-  {
-    title: 'Products Sold',
-    value: '567',
-    change: '+15.3%',
-    changeType: 'positive',
-    icon: ShoppingBag,
-  },
-  {
-    title: 'Conversion Rate',
-    value: '23.4%',
-    change: '+2.1%',
-    changeType: 'positive',
-    icon: Target,
-  },
-];
-
 export default function AdminAnalytics() {
   const [timeframe, setTimeframe] = useState('month');
   const [chartType, setChartType] = useState('line');
+
+  // Real data hooks
+  const { analytics, loading, error, fetchSalesAnalytics, fetchCustomerAnalytics, fetchProductAnalytics } = useAnalytics();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -101,6 +59,75 @@ export default function AdminAnalytics() {
       minimumFractionDigits: 0,
     }).format(amount);
   };
+
+  // Process real data
+  const salesData = analytics.sales?.salesByMonth || [];
+  const pieData = analytics.products?.productsByCategory?.map(cat => ({
+    name: cat.category,
+    value: cat.count,
+    color: getCategoryColor(cat.category)
+  })) || [];
+
+  const metrics = [
+    {
+      title: 'Total Revenue',
+      value: formatCurrency(analytics.sales?.totalRevenue || 0),
+      change: '+12.5%',
+      changeType: 'positive' as const,
+      icon: DollarSign,
+    },
+    {
+      title: 'Total Customers',
+      value: (analytics.customers?.totalCustomers || 0).toString(),
+      change: '+8.2%',
+      changeType: 'positive' as const,
+      icon: Users,
+    },
+    {
+      title: 'Products Sold',
+      value: (analytics.sales?.totalSales || 0).toString(),
+      change: '+15.3%',
+      changeType: 'positive' as const,
+      icon: ShoppingBag,
+    },
+    {
+      title: 'Conversion Rate',
+      value: '23.4%',
+      change: '+2.1%',
+      changeType: 'positive' as const,
+      icon: Target,
+    },
+  ];
+
+  const getCategoryColor = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'gold': return '#FFD700';
+      case 'diamond': return '#B9F2FF';
+      case 'silver': return '#C0C0C0';
+      case 'platinum': return '#E5E4E2';
+      default: return '#8884d8';
+    }
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <LoadingSpinner text="Loading analytics data..." />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <ErrorMessage error={error} />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -143,19 +170,23 @@ export default function AdminAnalytics() {
             >
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    {metric.title}
+                  </CardTitle>
                   <metric.icon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metric.value}</div>
-                  <div className="flex items-center text-xs text-muted-foreground">
+                  <p className={`text-xs flex items-center mt-1 ${
+                    metric.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+                  }`}>
                     {metric.changeType === 'positive' ? (
-                      <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                      <TrendingUp className="h-3 w-3 mr-1" />
                     ) : (
-                      <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                      <TrendingDown className="h-3 w-3 mr-1" />
                     )}
-                    {metric.change} from last {timeframe}
-                  </div>
+                    {metric.change}
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -165,130 +196,122 @@ export default function AdminAnalytics() {
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Sales Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Sales Performance</CardTitle>
-                    <CardDescription>Revenue trends over time</CardDescription>
-                  </div>
-                  <Select value={chartType} onValueChange={setChartType}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="line">Line</SelectItem>
-                      <SelectItem value="area">Area</SelectItem>
-                      <SelectItem value="bar">Bar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  {chartType === 'line' ? (
-                    <RechartsLineChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Legend />
-                      <Line type="monotone" dataKey="sales" stroke="#8884d8" strokeWidth={2} />
-                    </RechartsLineChart>
-                  ) : chartType === 'area' ? (
-                    <AreaChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Legend />
-                      <Area type="monotone" dataKey="sales" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Legend />
-                      <Bar dataKey="sales" fill="#8884d8" />
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales Performance</CardTitle>
+              <CardDescription>Monthly sales trends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsLineChart data={salesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Legend />
+                  <Line type="monotone" dataKey="sales" stroke="#8884d8" strokeWidth={2} />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-          {/* Product Category Distribution */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Categories</CardTitle>
-                <CardDescription>Sales distribution by category</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RechartsPieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Category Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Categories</CardTitle>
+              <CardDescription>Distribution by category</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Additional Analytics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top Products */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer Insights</CardTitle>
-              <CardDescription>Detailed customer behavior analysis</CardDescription>
+              <CardTitle>Top Selling Products</CardTitle>
+              <CardDescription>Best performing items</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">78%</div>
-                  <div className="text-sm text-gray-600">Customer Retention Rate</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">₹45,000</div>
-                  <div className="text-sm text-gray-600">Average Order Value</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">2.3</div>
-                  <div className="text-sm text-gray-600">Items per Order</div>
-                </div>
+              <div className="space-y-4">
+                {analytics.products?.topSellingProducts?.slice(0, 5).map((product, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{product.name}</p>
+                      <p className="text-sm text-gray-500">{product.sales} sold</p>
+                    </div>
+                    <p className="font-medium">{formatCurrency(product.revenue)}</p>
+                  </div>
+                )) || (
+                  <p className="text-gray-500">No data available</p>
+                )}
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+
+          {/* Top Customers */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Customers</CardTitle>
+              <CardDescription>Highest spending customers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {analytics.sales?.topCustomers?.slice(0, 5).map((customer, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{customer.name}</p>
+                      <p className="text-sm text-gray-500">{customer.orders} orders</p>
+                    </div>
+                    <p className="font-medium">{formatCurrency(customer.totalSpent)}</p>
+                  </div>
+                )) || (
+                  <p className="text-gray-500">No data available</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Growth */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Growth</CardTitle>
+              <CardDescription>Monthly customer acquisition</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={analytics.customers?.customerGrowth || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="newCustomers" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

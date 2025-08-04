@@ -1,414 +1,766 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout';
-import { PageHeader } from '@/components/layout/page-header';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Users, 
   Plus, 
   Search, 
   Filter, 
-  MoreHorizontal, 
-  Eye, 
-  Edit, 
-  Trash2, 
   Phone, 
   Mail, 
-  MapPin, 
+  MapPin,
   Calendar,
-  Download,
-  Upload,
-  RefreshCw,
-  ArrowLeft
+  UserPlus,
+  TrendingUp,
+  Eye,
+  Edit,
+  Trash2
 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
-// Mock data - replace with actual API calls
-const mockCustomers = [
-  {
-    id: 1,
-    name: 'Rahul Sharma',
-    phone: '+91 98765 43210',
-    email: 'rahul.sharma@email.com',
-    floor: 'Floor 1',
-    status: 'active',
-    lastVisit: '2024-01-15',
-    totalPurchases: 45000,
-    followUpDate: '2024-01-20',
-    assignedTo: 'Priya Patel',
-  },
-  {
-    id: 2,
-    name: 'Priya Patel',
-    phone: '+91 87654 32109',
-    email: 'priya.patel@email.com',
-    floor: 'Floor 2',
-    status: 'pending',
-    lastVisit: '2024-01-10',
-    totalPurchases: 0,
-    followUpDate: '2024-01-18',
-    assignedTo: 'Amit Kumar',
-  },
-  {
-    id: 3,
-    name: 'Amit Kumar',
-    phone: '+91 76543 21098',
-    email: 'amit.kumar@email.com',
-    floor: 'Floor 1',
-    status: 'active',
-    lastVisit: '2024-01-12',
-    totalPurchases: 125000,
-    followUpDate: '2024-01-25',
-    assignedTo: 'Priya Patel',
-  },
-  {
-    id: 4,
-    name: 'Neha Singh',
-    phone: '+91 65432 10987',
-    email: 'neha.singh@email.com',
-    floor: 'Floor 3',
-    status: 'inactive',
-    lastVisit: '2023-12-20',
-    totalPurchases: 78000,
-    followUpDate: null,
-    assignedTo: 'Rajesh Verma',
-  },
-  {
-    id: 5,
-    name: 'Rajesh Verma',
-    phone: '+91 54321 09876',
-    email: 'rajesh.verma@email.com',
-    floor: 'Floor 2',
-    status: 'active',
-    lastVisit: '2024-01-14',
-    totalPurchases: 92000,
-    followUpDate: '2024-01-22',
-    assignedTo: 'Amit Kumar',
-  },
-];
+interface Customer {
+  id: string;
+  name: string;
+  email?: string;
+  phone: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  occupation?: string;
+  incomeRange?: string;
+  socialCircle?: string;
+  occasions?: string[];
+  budgetRange?: string;
+  notes?: string;
+  status: string;
+  createdAt: string;
+  floor?: {
+    id: string;
+    name: string;
+  };
+  assignedTo?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface CustomerStats {
+  total: number;
+  active: number;
+  prospect: number;
+  converted: number;
+  recentAdditions: number;
+}
 
 export default function CustomersPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [floorFilter, setFloorFilter] = useState('all');
-  const [customers, setCustomers] = useState(mockCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [stats, setStats] = useState<CustomerStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterFloor, setFilterFloor] = useState('all');
+  const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
+  const [showEditCustomerDialog, setShowEditCustomerDialog] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [floors, setFloors] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    dateOfBirth: '',
+    gender: '',
+    occupation: '',
+    incomeRange: '',
+    socialCircle: '',
+    occasions: [] as string[],
+    budgetRange: '',
+    notes: '',
+    status: 'ACTIVE',
+    floorId: '',
+    assignedToId: ''
+  });
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    // TODO: Implement actual search logic
-    console.log('Search query:', query);
-  };
+  useEffect(() => {
+    loadCustomersData();
+    loadFormData();
+  }, []);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-success-100 text-success-700">Active</Badge>;
-      case 'pending':
-        return <Badge className="bg-warning-100 text-warning-700">Pending</Badge>;
-      case 'inactive':
-        return <Badge className="bg-error-100 text-error-700">Inactive</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+  const loadCustomersData = async () => {
+    try {
+      setLoading(true);
+      
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterStatus !== 'all') params.append('status', filterStatus);
+      if (filterFloor !== 'all') params.append('floorId', filterFloor);
+      
+      const response = await fetch(`/api/customers?${params}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCustomers(data.data || []);
+        calculateStats(data.data || []);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load customers",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load customers",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
+  const loadFormData = async () => {
+    try {
+      const [floorsRes, usersRes] = await Promise.all([
+        fetch('/api/floors'),
+        fetch('/api/users')
+      ]);
+
+      const floorsData = await floorsRes.json();
+      const usersData = await usersRes.json();
+
+      if (floorsRes.ok) setFloors(floorsData.data || []);
+      if (usersRes.ok) setUsers(usersData.data || []);
+    } catch (error) {
+      console.error('Error loading form data:', error);
+    }
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN');
+  const calculateStats = (customersData: Customer[]) => {
+    const stats: CustomerStats = {
+      total: customersData.length,
+      active: customersData.filter(c => c.status === 'ACTIVE').length,
+      prospect: customersData.filter(c => c.status === 'PROSPECT').length,
+      converted: customersData.filter(c => c.status === 'CONVERTED').length,
+      recentAdditions: customersData.filter(c => {
+        const createdAt = new Date(c.createdAt);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return createdAt >= weekAgo;
+      }).length
+    };
+    setStats(stats);
+  };
+
+  const handleNewCustomer = async () => {
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newCustomer,
+          storeId: 'store-001'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Customer added successfully",
+        });
+        setShowNewCustomerDialog(false);
+        setNewCustomer({
+          name: '',
+          email: '',
+          phone: '',
+          address: '',
+          city: '',
+          state: '',
+          pincode: '',
+          dateOfBirth: '',
+          gender: '',
+          occupation: '',
+          incomeRange: '',
+          socialCircle: '',
+          occasions: [],
+          budgetRange: '',
+          notes: '',
+          status: 'ACTIVE',
+          floorId: '',
+          assignedToId: ''
+        });
+        loadCustomersData();
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to add customer",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add customer",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditCustomer = async () => {
+    if (!selectedCustomer) return;
+
+    try {
+      const response = await fetch(`/api/customers/${selectedCustomer.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomer)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Customer updated successfully",
+        });
+        setShowEditCustomerDialog(false);
+        setSelectedCustomer(null);
+        loadCustomersData();
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update customer",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update customer",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    if (!confirm('Are you sure you want to delete this customer?')) return;
+
+    try {
+      const response = await fetch(`/api/customers/${customerId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Customer deleted successfully",
+        });
+        loadCustomersData();
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete customer",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete customer",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditDialog = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setNewCustomer({
+      name: customer.name,
+      email: customer.email || '',
+      phone: customer.phone,
+      address: customer.address || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      pincode: customer.pincode || '',
+      dateOfBirth: customer.dateOfBirth || '',
+      gender: customer.gender || '',
+      occupation: customer.occupation || '',
+      incomeRange: customer.incomeRange || '',
+      socialCircle: customer.socialCircle || '',
+      occasions: customer.occasions || [],
+      budgetRange: customer.budgetRange || '',
+      notes: customer.notes || '',
+      status: customer.status,
+      floorId: customer.floor?.id || '',
+      assignedToId: customer.assignedTo?.id || ''
+    });
+    setShowEditCustomerDialog(true);
   };
 
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         customer.phone.includes(searchQuery);
-    const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
-    const matchesFloor = floorFilter === 'all' || customer.floor === floorFilter;
+    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         customer.phone.includes(searchTerm) ||
+                         (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus = filterStatus === 'all' || customer.status === filterStatus;
+    const matchesFloor = filterFloor === 'all' || customer.floor?.id === filterFloor;
     
     return matchesSearch && matchesStatus && matchesFloor;
   });
 
   return (
-    <DashboardLayout
-      userRole="BUSINESS_ADMIN"
-      searchPlaceholder="Search customers by name, email, or phone..."
-      onSearch={handleSearch}
-    >
-      <PageHeader
-        title="Customers"
-        description="Manage your customer database and track interactions"
-        breadcrumbs={true}
-        actions={
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <Link href="/customers/new">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Customer Management</h1>
+            <p className="text-gray-600">Manage all customer relationships and interactions</p>
+          </div>
+          <Dialog open={showNewCustomerDialog} onOpenChange={setShowNewCustomerDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
                 Add Customer
               </Button>
-            </Link>
-            <Link href="/admin/dashboard">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </Link>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Customer</DialogTitle>
+                <DialogDescription>Enter customer details to add them to the system</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Name *</Label>
+                    <Input
+                      value={newCustomer.name}
+                      onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                      placeholder="Full name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Phone *</Label>
+                    <Input
+                      value={newCustomer.phone}
+                      onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                      placeholder="Phone number"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={newCustomer.email}
+                    onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})}
+                    placeholder="Email address"
+                  />
+                </div>
+                <div>
+                  <Label>Address</Label>
+                  <Input
+                    value={newCustomer.address}
+                    onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                    placeholder="Full address"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>City</Label>
+                    <Input
+                      value={newCustomer.city}
+                      onChange={(e) => setNewCustomer({...newCustomer, city: e.target.value})}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input
+                      value={newCustomer.state}
+                      onChange={(e) => setNewCustomer({...newCustomer, state: e.target.value})}
+                      placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <Label>Pincode</Label>
+                    <Input
+                      value={newCustomer.pincode}
+                      onChange={(e) => setNewCustomer({...newCustomer, pincode: e.target.value})}
+                      placeholder="Pincode"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Date of Birth</Label>
+                    <Input
+                      type="date"
+                      value={newCustomer.dateOfBirth}
+                      onChange={(e) => setNewCustomer({...newCustomer, dateOfBirth: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Gender</Label>
+                    <Select value={newCustomer.gender} onValueChange={(value) => setNewCustomer({...newCustomer, gender: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MALE">Male</SelectItem>
+                        <SelectItem value="FEMALE">Female</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Occupation</Label>
+                    <Input
+                      value={newCustomer.occupation}
+                      onChange={(e) => setNewCustomer({...newCustomer, occupation: e.target.value})}
+                      placeholder="Occupation"
+                    />
+                  </div>
+                  <div>
+                    <Label>Income Range</Label>
+                    <Select value={newCustomer.incomeRange} onValueChange={(value) => setNewCustomer({...newCustomer, incomeRange: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select income range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0-300000">₹0 - ₹3,00,000</SelectItem>
+                        <SelectItem value="300000-500000">₹3,00,000 - ₹5,00,000</SelectItem>
+                        <SelectItem value="500000-1000000">₹5,00,000 - ₹10,00,000</SelectItem>
+                        <SelectItem value="1000000+">₹10,00,000+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Budget Range</Label>
+                  <Select value={newCustomer.budgetRange} onValueChange={(value) => setNewCustomer({...newCustomer, budgetRange: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select budget range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10000-30000">₹10,000 - ₹30,000</SelectItem>
+                      <SelectItem value="30000-80000">₹30,000 - ₹80,000</SelectItem>
+                      <SelectItem value="80000-150000">₹80,000 - ₹1,50,000</SelectItem>
+                      <SelectItem value="150000+">₹1,50,000+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Assigned Floor</Label>
+                    <Select value={newCustomer.floorId} onValueChange={(value) => setNewCustomer({...newCustomer, floorId: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select floor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {floors.map((floor: any) => (
+                          <SelectItem key={floor.id} value={floor.id}>
+                            {floor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Assigned To</Label>
+                    <Select value={newCustomer.assignedToId} onValueChange={(value) => setNewCustomer({...newCustomer, assignedToId: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user: any) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Input
+                    value={newCustomer.notes}
+                    onChange={(e) => setNewCustomer({...newCustomer, notes: e.target.value})}
+                    placeholder="Additional notes"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowNewCustomerDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleNewCustomer}>
+                    Add Customer
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Stats */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <p className="text-xs text-muted-foreground">All customers</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.active}</div>
+                <p className="text-xs text-muted-foreground">Active customers</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Prospects</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.prospect}</div>
+                <p className="text-xs text-muted-foreground">Potential customers</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Converted</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.converted}</div>
+                <p className="text-xs text-muted-foreground">Converted customers</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Recent</CardTitle>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.recentAdditions}</div>
+                <p className="text-xs text-muted-foreground">Added this week</p>
+              </CardContent>
+            </Card>
           </div>
-        }
-      />
+        )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Filters */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Total Customers</p>
-                <p className="text-2xl font-bold text-navy-900">{customers.length}</p>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search customers by name, phone, email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Active Customers</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {customers.filter(c => c.status === 'active').length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-success-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Pending Follow-ups</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {customers.filter(c => c.followUpDate && new Date(c.followUpDate) <= new Date()).length}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-warning-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-navy-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-navy-900">
-                  {formatCurrency(customers.reduce((sum, c) => sum + c.totalPurchases, 0))}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-navy-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-navy-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters and Search */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-navy-400" />
-                <Input
-                  placeholder="Search customers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Status" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full md:w-40">
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="PROSPECT">Prospect</SelectItem>
+                  <SelectItem value="CONVERTED">Converted</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-navy-700">Floor</label>
-              <Select value={floorFilter} onValueChange={setFloorFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Floors" />
+              <Select value={filterFloor} onValueChange={setFilterFloor}>
+                <SelectTrigger className="w-full md:w-40">
+                  <SelectValue placeholder="Floor" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Floors</SelectItem>
-                  <SelectItem value="Floor 1">Floor 1</SelectItem>
-                  <SelectItem value="Floor 2">Floor 2</SelectItem>
-                  <SelectItem value="Floor 3">Floor 3</SelectItem>
+                  {floors.map((floor: any) => (
+                    <SelectItem key={floor.id} value={floor.id}>
+                      {floor.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <Button variant="outline" onClick={loadCustomersData}>
+                <Filter className="h-4 w-4 mr-2" />
+                Apply
+              </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Customers Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Customer List</CardTitle>
-              <CardDescription>
-                Showing {filteredCustomers.length} of {customers.length} customers
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Floor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Visit</TableHead>
-                  <TableHead>Total Purchases</TableHead>
-                  <TableHead>Follow-up</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-navy-900">{customer.name}</p>
-                        <p className="text-sm text-navy-600">ID: {customer.id}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-sm">
-                          <Phone className="mr-1 h-3 w-3 text-navy-400" />
-                          {customer.phone}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="mr-1 h-3 w-3 text-navy-400" />
-                          {customer.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm">
-                        <MapPin className="mr-1 h-3 w-3 text-navy-400" />
-                        {customer.floor}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(customer.status)}
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(customer.lastVisit)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium text-navy-900">
-                        {formatCurrency(customer.totalPurchases)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {customer.followUpDate ? (
-                        <div className="flex items-center text-sm">
-                          <Calendar className="mr-1 h-3 w-3 text-navy-400" />
-                          {formatDate(customer.followUpDate)}
-                        </div>
-                      ) : (
-                        <span className="text-navy-400">No follow-up</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-navy-600">{customer.assignedTo}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Customer
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-error-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Customer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+        {/* Customers Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Customers</CardTitle>
+            <CardDescription>Manage customer information and relationships</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Loading customers...</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Floor</TableHead>
+                    <TableHead>Assigned To</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{customer.name}</div>
+                          <div className="text-sm text-gray-500">{customer.occupation}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {customer.phone}
+                          </div>
+                          {customer.email && (
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {customer.email}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {customer.city && (
+                          <div className="flex items-center text-sm text-gray-500">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {customer.city}, {customer.state}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={customer.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                          {customer.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {customer.floor?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {customer.assignedTo?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(customer)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomer(customer.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {!loading && filteredCustomers.length === 0 && (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No customers found</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Customer Dialog */}
+        <Dialog open={showEditCustomerDialog} onOpenChange={setShowEditCustomerDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Customer</DialogTitle>
+              <DialogDescription>Update customer information</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Same form fields as new customer */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input
+                    value={newCustomer.name}
+                    onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                    placeholder="Full name"
+                  />
+                </div>
+                <div>
+                  <Label>Phone *</Label>
+                  <Input
+                    value={newCustomer.phone}
+                    onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                    placeholder="Phone number"
+                  />
+                </div>
+              </div>
+              {/* Add all other fields similar to new customer form */}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowEditCustomerDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleEditCustomer}>
+                  Update Customer
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </DashboardLayout>
   );
 } 

@@ -1,30 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const storeId = searchParams.get('storeId') || 'test-store-id';
+    const storeId = searchParams.get('storeId') || '550e8400-e29b-41d4-a716-446655440000';
 
-    // Get categories for the store
     const categories = await prisma.category.findMany({
       where: {
         storeId,
         isActive: true
-      },
-      include: {
-        parent: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        children: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
       },
       orderBy: {
         name: 'asc'
@@ -35,11 +22,46 @@ export async function GET(request: NextRequest) {
       success: true,
       data: categories
     });
-
   } catch (error: any) {
-    console.error('Error fetching categories:', error);
+    console.error('Categories GET error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch categories' },
+      { success: false, error: error.message || 'Failed to fetch categories' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { name, description, parentId, storeId = '550e8400-e29b-41d4-a716-446655440000' } = body;
+
+    if (!name) {
+      return NextResponse.json(
+        { success: false, error: 'Category name is required' },
+        { status: 400 }
+      );
+    }
+
+    const category = await prisma.category.create({
+      data: {
+        name,
+        description,
+        parentId,
+        storeId,
+        isActive: true
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Category created successfully',
+      data: category
+    });
+  } catch (error: any) {
+    console.error('Categories POST error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to create category' },
       { status: 500 }
     );
   }

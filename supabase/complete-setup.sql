@@ -11,6 +11,12 @@ CREATE TYPE follow_up_type AS ENUM ('PHONE_CALL', 'EMAIL', 'SMS', 'VISIT', 'DEMO
 CREATE TYPE follow_up_status AS ENUM ('PENDING', 'COMPLETED', 'CANCELLED', 'RESCHEDULED');
 CREATE TYPE sale_status AS ENUM ('PENDING', 'COMPLETED', 'CANCELLED', 'REFUNDED');
 
+-- Additional enums for approval and escalation workflows
+CREATE TYPE approval_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'ESCALATED', 'CANCELLED');
+CREATE TYPE approval_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
+CREATE TYPE escalation_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
+CREATE TYPE escalation_status AS ENUM ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED');
+
 -- STEP 2: CREATE CORE TABLES
 CREATE TABLE stores (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -197,6 +203,55 @@ CREATE TABLE customer_product_preferences (
   UNIQUE(customer_id, product_id)
 );
 
+-- Additional tables for approval and escalation workflows
+CREATE TABLE approval_workflows (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  "actionType" character varying(50) NOT NULL,
+  requester_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  approver_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  status approval_status DEFAULT 'PENDING',
+  "requestData" jsonb NOT NULL,
+  approval_notes text,
+  priority approval_priority DEFAULT 'MEDIUM',
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  approved_at timestamp with time zone,
+  CONSTRAINT approval_workflows_pkey PRIMARY KEY (id),
+  CONSTRAINT approval_workflows_requester_id_fkey FOREIGN KEY (requester_id) REFERENCES users(id),
+  CONSTRAINT approval_workflows_approver_id_fkey FOREIGN KEY (approver_id) REFERENCES users(id)
+);
+
+CREATE TABLE audit_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action character varying(100) NOT NULL,
+  entity_type character varying(50) NOT NULL,
+  entity_id uuid NOT NULL,
+  "oldData" jsonb,
+  "newData" jsonb,
+  ip_address character varying(45),
+  user_agent text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE escalations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title character varying(255) NOT NULL,
+  description text NOT NULL,
+  priority escalation_priority DEFAULT 'MEDIUM',
+  status escalation_status DEFAULT 'OPEN',
+  requester_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assignee_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  resolved_at timestamp with time zone,
+  CONSTRAINT escalations_pkey PRIMARY KEY (id),
+  CONSTRAINT escalations_requester_id_fkey FOREIGN KEY (requester_id) REFERENCES users(id),
+  CONSTRAINT escalations_assignee_id_fkey FOREIGN KEY (assignee_id) REFERENCES users(id)
+);
+
 -- STEP 3: CREATE PERFORMANCE INDEXES
 CREATE INDEX idx_users_store_id ON users(store_id);
 CREATE INDEX idx_users_email ON users(email);
@@ -219,6 +274,21 @@ CREATE INDEX idx_sales_customer_id ON sales(customer_id);
 CREATE INDEX idx_sales_created_at ON sales(created_at);
 CREATE INDEX idx_customer_product_preferences_customer_id ON customer_product_preferences(customer_id);
 CREATE INDEX idx_customer_product_preferences_product_id ON customer_product_preferences(product_id);
+
+-- Indexes for approval and escalation workflows
+CREATE INDEX idx_approval_workflows_requester_id ON approval_workflows(requester_id);
+CREATE INDEX idx_approval_workflows_approver_id ON approval_workflows(approver_id);
+CREATE INDEX idx_approval_workflows_status ON approval_workflows(status);
+CREATE INDEX idx_approval_workflows_action_type ON approval_workflows("actionType");
+
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+
+CREATE INDEX idx_escalations_requester_id ON escalations(requester_id);
+CREATE INDEX idx_escalations_assignee_id ON escalations(assignee_id);
+CREATE INDEX idx_escalations_status ON escalations(status);
+CREATE INDEX idx_escalations_priority ON escalations(priority);
 
 -- STEP 4: CREATE DATABASE FUNCTIONS
 CREATE OR REPLACE FUNCTION generate_sku(category_name TEXT, product_id UUID)
@@ -254,6 +324,8 @@ CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH R
 CREATE TRIGGER update_interactions_updated_at BEFORE UPDATE ON interactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_follow_ups_updated_at BEFORE UPDATE ON follow_ups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_sales_updated_at BEFORE UPDATE ON sales FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_approval_workflows_updated_at BEFORE UPDATE ON approval_workflows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_escalations_updated_at BEFORE UPDATE ON escalations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- STEP 6: CREATE ANALYTICS VIEWS
 CREATE VIEW sales_analytics AS

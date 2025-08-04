@@ -1,282 +1,145 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Customer, CreateCustomerInput, UpdateCustomerInput, CustomerFilters } from '@/types/customer';
+import { useState, useEffect } from 'react';
+import { ApiClient } from '@/lib/api';
 
-interface UseCustomersOptions {
-  autoFetch?: boolean;
-  initialFilters?: CustomerFilters;
-  pageSize?: number;
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  gender: 'MALE' | 'FEMALE';
+  status: 'ACTIVE' | 'PROSPECT' | 'CONVERTED';
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  storeId?: string;
+  floorId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface CustomersResponse {
-  customers: Customer[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
+export interface CustomersResponse {
+  success: boolean;
+  data: Customer[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
-export function useCustomers(options: UseCustomersOptions = {}) {
-  const {
-    autoFetch = true,
-    initialFilters = {},
-    pageSize = 20,
-  } = options;
-
-  // State
+export function useCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<CustomerFilters>(initialFilters);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: pageSize,
-    total: 0,
-    pages: 0,
-  });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
 
-  // Fetch customers
-  const fetchCustomers = useCallback(async (
-    newFilters?: CustomerFilters,
-    page = 1
-  ) => {
-    setLoading(true);
-    setError(null);
-
+  const fetchCustomers = async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    floor?: string;
+  }) => {
     try {
-      const queryParams = new URLSearchParams();
+      setLoading(true);
+      setError(null);
       
-      // Add pagination
-      queryParams.append('page', page.toString());
-      queryParams.append('limit', pageSize.toString());
-      
-      // Add filters
-      const currentFilters = newFilters || filters;
-      if (currentFilters.search) queryParams.append('search', currentFilters.search);
-      if (currentFilters.status) queryParams.append('status', currentFilters.status);
-      if (currentFilters.floorId) queryParams.append('floorId', currentFilters.floorId);
-      if (currentFilters.assignedToId) queryParams.append('assignedToId', currentFilters.assignedToId);
-      if (currentFilters.dateFrom) queryParams.append('dateFrom', currentFilters.dateFrom.toISOString());
-      if (currentFilters.dateTo) queryParams.append('dateTo', currentFilters.dateTo.toISOString());
+      const response = await ApiClient.getCustomers({
+        page: params?.page || page,
+        limit: params?.limit || limit,
+        search: params?.search,
+        status: params?.status,
+        floor: params?.floor,
+      }) as CustomersResponse;
 
-      const response = await fetch(`/api/customers?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: { success: boolean; data: Customer[]; pagination: any } = await response.json();
-      
-      if (data.success) {
-        setCustomers(data.data);
-        setPagination(data.pagination);
-        if (newFilters) {
-          setFilters(newFilters);
-        }
-      } else {
-        throw new Error('Failed to fetch customers');
-      }
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch customers');
+      setCustomers(response.data);
+      setTotal(response.total);
+      setPage(response.page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch customers');
       console.error('Error fetching customers:', err);
     } finally {
       setLoading(false);
     }
-  }, [filters, pageSize]);
+  };
 
-  // Create customer
-  const createCustomer = useCallback(async (customerData: CreateCustomerInput): Promise<Customer | null> => {
-    setLoading(true);
-    setError(null);
-
+  const createCustomer = async (customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const response = await fetch('/api/customers', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customerData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: { success: boolean; data: Customer; message: string } = await response.json();
+      setLoading(true);
+      setError(null);
       
-      if (data.success) {
-        // Add new customer to the list
-        setCustomers(prev => [data.data, ...prev]);
-        return data.data;
-      } else {
-        throw new Error('Failed to create customer');
-      }
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to create customer');
+      const response = await ApiClient.createCustomer(customerData);
+      
+      // Refresh the customers list
+      await fetchCustomers();
+      
+      return response;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create customer');
       console.error('Error creating customer:', err);
-      return null;
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  // Update customer
-  const updateCustomer = useCallback(async (id: string, customerData: UpdateCustomerInput): Promise<Customer | null> => {
-    setLoading(true);
-    setError(null);
-
+  const updateCustomer = async (id: string, customerData: Partial<Customer>) => {
     try {
-      const response = await fetch(`/api/customers/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customerData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: { success: boolean; data: Customer; message: string } = await response.json();
+      setLoading(true);
+      setError(null);
       
-      if (data.success) {
-        // Update customer in the list
-        setCustomers(prev => prev.map(customer => 
-          customer.id === id ? data.data : customer
-        ));
-        return data.data;
-      } else {
-        throw new Error('Failed to update customer');
-      }
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to update customer');
+      const response = await ApiClient.updateCustomer(id, customerData) as any;
+      
+      // Update the customer in the local state
+      setCustomers(prev => prev.map(customer => 
+        customer.id === id ? { ...customer, ...response.data } : customer
+      ));
+      
+      return response;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update customer');
       console.error('Error updating customer:', err);
-      return null;
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  // Delete customer
-  const deleteCustomer = useCallback(async (id: string): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
-
+  const deleteCustomer = async (id: string) => {
     try {
-      const response = await fetch(`/api/customers/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: { success: boolean; message: string } = await response.json();
+      setLoading(true);
+      setError(null);
       
-      if (data.success) {
-        // Remove customer from the list
-        setCustomers(prev => prev.filter(customer => customer.id !== id));
-        return true;
-      } else {
-        throw new Error('Failed to delete customer');
-      }
-
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete customer');
+      await ApiClient.deleteCustomer(id);
+      
+      // Remove the customer from the local state
+      setCustomers(prev => prev.filter(customer => customer.id !== id));
+      setTotal(prev => prev - 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete customer');
       console.error('Error deleting customer:', err);
-      return false;
+      throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  // Search customers
-  const searchCustomers = useCallback(async (query: string): Promise<Customer[]> => {
-    try {
-      const response = await fetch(`/api/customers/search?q=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: { success: boolean; data: Customer[] } = await response.json();
-      
-      if (data.success) {
-        return data.data;
-      } else {
-        throw new Error('Failed to search customers');
-      }
-
-    } catch (err: any) {
-      console.error('Error searching customers:', err);
-      return [];
-    }
-  }, []);
-
-  // Apply filters
-  const applyFilters = useCallback((newFilters: CustomerFilters) => {
-    setFilters(newFilters);
-    fetchCustomers(newFilters, 1);
-  }, [fetchCustomers]);
-
-  // Change page
-  const changePage = useCallback((page: number) => {
-    fetchCustomers(filters, page);
-  }, [fetchCustomers, filters]);
-
-  // Clear error
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  // Auto-fetch on mount
+  // Load customers on mount
   useEffect(() => {
-    if (autoFetch) {
-      fetchCustomers();
-    }
-  }, [autoFetch, fetchCustomers]);
+    fetchCustomers();
+  }, []);
 
   return {
-    // State
     customers,
     loading,
     error,
-    filters,
-    pagination,
-    
-    // Actions
+    total,
+    page,
+    limit,
     fetchCustomers,
     createCustomer,
     updateCustomer,
     deleteCustomer,
-    searchCustomers,
-    applyFilters,
-    changePage,
-    clearError,
-    
-    // Computed
-    hasCustomers: customers.length > 0,
-    totalCustomers: pagination.total,
   };
 } 
