@@ -3,10 +3,6 @@ const nextConfig = {
   images: {
     domains: ['localhost', 'supabase.co'],
   },
-  // Production optimizations
-  experimental: {
-    optimizeCss: true,
-  },
   // Ensure proper handling of environment variables
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
@@ -18,8 +14,6 @@ const nextConfig = {
     }
     return config
   },
-  // Output configuration
-  output: 'standalone',
   // Disable x-powered-by header
   poweredByHeader: false,
   // Compress responses
@@ -33,20 +27,6 @@ const nextConfig = {
   // Disable TypeScript checking during build for deployment
   typescript: {
     ignoreBuildErrors: true,
-  },
-  // Disable static generation for API routes
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, must-revalidate',
-          },
-        ],
-      },
-    ]
   },
 }
 
