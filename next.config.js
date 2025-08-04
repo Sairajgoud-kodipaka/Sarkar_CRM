@@ -34,6 +34,20 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Disable static generation for API routes
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig 
